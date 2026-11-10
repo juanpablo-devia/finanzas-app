@@ -4,12 +4,25 @@ import type { Movimiento } from './types'
 import { formatearFecha, formatearPesos, hoyISO } from './utils/formato'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from './db'
+import Bienvenida from './components/Bienvenida'
+import { obtenerIniciales, saludoSegunHora } from './utils/saludo'
 
 const sumar = (lista: Movimiento[]) => lista.reduce((total, m) => total + m.monto, 0)
 
 function App() {
   const movimientos = useLiveQuery(() => db.movimientos.toArray(), []) ?? []
   const [formularioAbierto, setFormularioAbierto] = useState(false)
+  const [nombre, setNombre] = useState(() => localStorage.getItem('nombre') ?? '')
+
+function guardarNombre(nuevo: string) {
+  localStorage.setItem('nombre', nuevo)
+  setNombre(nuevo)
+}
+
+function cambiarNombre() {
+  const nuevo = window.prompt('¿Cómo quieres que te llame?', nombre)
+  if (nuevo?.trim()) guardarNombre(nuevo.trim())
+}
 
   // ---- Valores derivados: se calculan en cada render, no se guardan ----
   const ingresos = movimientos.filter((m) => m.tipo === 'ingreso')
@@ -36,12 +49,24 @@ function App() {
   const ok = window.confirm(`¿Eliminar "${m.descripcion}" por ${formatearPesos(m.monto)}?`)
   if (ok) await db.movimientos.delete(m.id)
 }
+if (!nombre) {
+  return <Bienvenida onListo={guardarNombre} />
+}
   return (
     <main className="mx-auto min-h-dvh max-w-md px-4 pt-[calc(1.5rem+env(safe-area-inset-top))] pb-32">
-      <header className="mb-6">
-        <p className="text-sm text-gray-500 dark:text-gray-400">Hola 👋</p>
-        <h1 className="text-2xl font-bold">Mis Finanzas</h1>
-      </header>
+      <header className="mb-6 flex items-center justify-between">
+  <div>
+    <p className="text-sm text-gray-500 dark:text-gray-400">{saludoSegunHora()} 👋</p>
+    <h1 className="text-2xl font-bold">{nombre}</h1>
+  </div>
+  <button
+    onClick={cambiarNombre}
+    aria-label="Cambiar nombre"
+    className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-600 font-semibold text-white transition active:scale-90"
+  >
+    {obtenerIniciales(nombre)}
+  </button>
+</header>
 
       <section className="rounded-3xl bg-emerald-600 p-6 text-white shadow-lg">
         <p className="text-sm opacity-80">Saldo disponible</p>
