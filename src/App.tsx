@@ -32,12 +32,12 @@ function App() {
   setFormularioAbierto(false)
 }
 
-async function eliminarMovimiento(m: Movimiento) {
+  async function eliminarMovimiento(m: Movimiento) {
   const ok = window.confirm(`¿Eliminar "${m.descripcion}" por ${formatearPesos(m.monto)}?`)
   if (ok) await db.movimientos.delete(m.id)
 }
   return (
-    <main className="mx-auto min-h-dvh max-w-md px-4 pt-6 pb-32">
+    <main className="mx-auto min-h-dvh max-w-md px-4 pt-[calc(1.5rem+env(safe-area-inset-top))] pb-32">
       <header className="mb-6">
         <p className="text-sm text-gray-500 dark:text-gray-400">Hola 👋</p>
         <h1 className="text-2xl font-bold">Mis Finanzas</h1>
@@ -73,9 +73,10 @@ async function eliminarMovimiento(m: Movimiento) {
           <ul className="space-y-2">
             {ordenados.map((m) => (
               <li
-                key={m.id}
-                className="flex items-center justify-between rounded-2xl bg-white p-4 shadow-sm dark:bg-gray-900"
-              >
+  key={m.id}
+  onClick={() => eliminarMovimiento(m)}
+  className="flex cursor-pointer items-center justify-between rounded-2xl bg-white p-4 shadow-sm transition active:scale-[0.98] dark:bg-gray-900"
+>
                 <div>
                   <p className="font-medium">{m.descripcion}</p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
