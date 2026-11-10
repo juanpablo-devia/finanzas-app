@@ -1,14 +1,18 @@
 import Dexie, { type EntityTable } from 'dexie'
-import type { Movimiento } from './types'
+import type { Meta, Movimiento } from './types'
 
 const db = new Dexie('MisFinanzasDB') as Dexie & {
   movimientos: EntityTable<Movimiento, 'id'>
+  metas: EntityTable<Meta, 'id'>
 }
 
-// Esquema: el primer campo es la llave primaria,
-// los demás son ÍNDICES (para buscar/filtrar rápido).
 db.version(1).stores({
   movimientos: 'id, fecha, tipo, categoria',
+})
+
+// Versión 2: agregamos la tabla de metas
+db.version(2).stores({
+  metas: 'id, fechaLimite',
 })
 
 export { db }
