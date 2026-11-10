@@ -2,11 +2,13 @@ import { useState } from 'react'
 import FormularioMovimiento from './components/FormularioMovimiento'
 import type { Movimiento } from './types'
 import { formatearFecha, formatearPesos, hoyISO } from './utils/formato'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { db } from './db'
 
 const sumar = (lista: Movimiento[]) => lista.reduce((total, m) => total + m.monto, 0)
 
 function App() {
-  const [movimientos, setMovimientos] = useState<Movimiento[]>([])
+  const movimientos = useLiveQuery(() => db.movimientos.toArray(), []) ?? []
   const [formularioAbierto, setFormularioAbierto] = useState(false)
 
   // ---- Valores derivados: se calculan en cada render, no se guardan ----
@@ -25,11 +27,15 @@ function App() {
 
   const ordenados = [...movimientos].sort((a, b) => b.fecha.localeCompare(a.fecha))
 
-  function agregarMovimiento(nuevo: Movimiento) {
-    setMovimientos((anteriores) => [nuevo, ...anteriores])
-    setFormularioAbierto(false)
-  }
+  async function agregarMovimiento(nuevo: Movimiento) {
+  await db.movimientos.add(nuevo)
+  setFormularioAbierto(false)
+}
 
+async function eliminarMovimiento(m: Movimiento) {
+  const ok = window.confirm(`¿Eliminar "${m.descripcion}" por ${formatearPesos(m.monto)}?`)
+  if (ok) await db.movimientos.delete(m.id)
+}
   return (
     <main className="mx-auto min-h-dvh max-w-md px-4 pt-6 pb-32">
       <header className="mb-6">
