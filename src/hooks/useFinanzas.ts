@@ -1,0 +1,87 @@
+import { useLiveQuery } from 'dexie-react-hooks'
+import { db } from '../db'
+import type { Abono, Meta, Movimiento } from '../types'
+import { hoyISO } from '../utils/formato'
+
+const sumar = (lista: Movimiento[]) => lista.reduce((total, m) => total + m.monto, 0)
+
+/**
+ * Custom hook con TODA la lógica de datos de la app:
+ * consultas a la base de datos, cálculos y acciones.
+ * Las pantallas solo se encargan de mostrar.
+ */
+export function useFinanzas() {
+  const movimientos = useLiveQuery(() => db.movimientos.toArray(), []) ?? []
+  const metas = useLiveQuery(() => db.metas.orderBy('fechaLimite').toArray(), []) ?? []
+
+  // ---- Valores derivados ----
+  const ingresos = movimientos.filter((m) => m.tipo === 'ingreso')
+  const gastos = movimientos.filter((m) => m.tipo === 'gasto')
+  const totalAhorrado = metas.reduce((total, meta) => total + meta.ahorrado, 0)
+
+  // Plata libre = lo que entró - lo gastado - lo apartado en metas
+  const saldo = sumar(ingresos) - sumar(gastos) - totalAhorrado
+
+  const mesActual = hoyISO().slice(0, 7) // 'YYYY-MM'
+  const ingresosMes = sumar(ingresos.filter((m) => m.fecha.startsWith(mesActual)))
+  const gastosMes = sumar(gastos.filter((m) => m.fecha.startsWith(mesActual)))
+
+  const hoy = new Date()
+  const diasDelMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate()
+  const diasRestantes = diasDelMes - hoy.getDate() + 1
+
+  // Lo de las metas ya está apartado, así que solo repartimos lo que es tuyo
+  const puedoGastarHoy = Math.max(0, Math.floor(saldo / diasRestantes))
+
+  // Más recientes primero
+  const ordenados = [...movimientos].sort((a, b) => b.fecha.localeCompare(a.fecha))
+
+  // ---- Acciones ----
+  async function agregarMovimiento(nuevo: Movimiento, abono: Abono | null) {
+    // Transacción: o se guardan las dos cosas, o ninguna
+    await db.transaction('rw', db.movimientos, db.metas, async () => {
+      await db.movimientos.add(nuevo)
+      if (abono) {
+        const meta = await db.metas.get(abono.metaId)
+        if (meta) await db.metas.update(meta.id, { ahorrado: meta.ahorrado + abono.monto })
+      }
+    })
+  }
+
+  async function eliminarMovimiento(id: string) {
+    await db.movimientos.delete(id)
+  }
+
+  async function agregarMeta(meta: Meta) {
+    await db.metas.add(meta)
+  }
+
+  async function abonarMeta(metaId: string, valor: number) {
+    await db.transaction('rw', db.metas, async () => {
+      const meta = await db.metas.get(metaId)
+      if (meta) await db.metas.update(metaId, { ahorrado: meta.ahorrado + valor })
+    })
+  }
+
+  async function eliminarMeta(id: string) {
+    await db.metas.delete(id)
+  }
+
+  return {
+    movimientos: ordenados,
+    metas,
+    saldo,
+    totalAhorrado,
+    ingresosMes,
+    gastosMes,
+    puedoGastarHoy,
+    agregarMovimiento,
+    eliminarMovimiento,
+    agregarMeta,
+    abonarMeta,
+    eliminarMeta,
+  }
+}
+
+// El tipo se deduce automáticamente de lo que retorna el hook
+export type Finanzas = ReturnType<typeof useFinanzas>

@@ -3,9 +3,11 @@ import { CATEGORIAS, type Abono, type Meta, type Movimiento, type TipoMovimiento
 import { generarId } from '../utils/id'
 import { formatearPesos, hoyISO } from '../utils/formato'
 import { calcularPlanMeta } from '../utils/metas'
+import CampoSelect from './CampoSelect'
 
 interface Props {
   metas: Meta[]
+  tipoInicial?: TipoMovimiento
   onGuardar: (movimiento: Movimiento, abono: Abono | null) => void
   onCerrar: () => void
 }
@@ -20,13 +22,13 @@ const EJEMPLOS: Record<TipoMovimiento, string> = {
 
 const PORCENTAJES = [10, 20, 30, 50]
 
-export default function FormularioMovimiento({ metas, onGuardar, onCerrar }: Props) {
+export default function FormularioMovimiento({ metas, tipoInicial = 'gasto', onGuardar, onCerrar }: Props) {
   const metasActivas = metas.filter((m) => !calcularPlanMeta(m).completada)
 
-  const [tipo, setTipo] = useState<TipoMovimiento>('gasto')
+  const [tipo, setTipo] = useState<TipoMovimiento>(tipoInicial)
   const [monto, setMonto] = useState('') // solo dígitos
   const [descripcion, setDescripcion] = useState('')
-  const [categoria, setCategoria] = useState(CATEGORIAS.gasto[0])
+  const [categoria, setCategoria] = useState(CATEGORIAS[tipoInicial][0])
   const [fecha, setFecha] = useState(hoyISO())
   const [metaId, setMetaId] = useState(metasActivas[0]?.id ?? '')
   const [abono, setAbono] = useState('') // solo dígitos
@@ -116,13 +118,13 @@ export default function FormularioMovimiento({ metas, onGuardar, onCerrar }: Pro
             </p>
 
             {metasActivas.length > 1 && (
-              <select value={metaId} onChange={(e) => setMetaId(e.target.value)} className={estiloCampo}>
+              <CampoSelect value={metaId} onChange={(e) => setMetaId(e.target.value)}>
                 {metasActivas.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.emoji} {m.nombre}
                   </option>
                 ))}
-              </select>
+              </CampoSelect>
             )}
 
             <div className="flex gap-2">
@@ -174,11 +176,11 @@ export default function FormularioMovimiento({ metas, onGuardar, onCerrar }: Pro
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
             <span className="text-sm text-gray-500 dark:text-gray-400">Categoría</span>
-            <select value={categoria} onChange={(e) => setCategoria(e.target.value)} className={estiloCampo}>
+            <CampoSelect value={categoria} onChange={(e) => setCategoria(e.target.value)}>
               {CATEGORIAS[tipo].map((c) => (
                 <option key={c}>{c}</option>
               ))}
-            </select>
+            </CampoSelect>
           </label>
           <label className="block">
             <span className="text-sm text-gray-500 dark:text-gray-400">Fecha</span>
