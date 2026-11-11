@@ -49,3 +49,15 @@ export function formatearFechaLarga(iso: string): string {
   })
   return texto.charAt(0).toUpperCase() + texto.slice(1)
 }
+
+// 'YYYY-MM' → "Noviembre de 2026"
+export function nombreMes(mes: string): string {
+  const texto = new Date(mes + '-01T00:00').toLocaleDateString('es-CO', { month: 'long', year: 'numeric' })
+  return texto.charAt(0).toUpperCase() + texto.slice(1)
+}
+
+// Suma (o resta) meses a un 'YYYY-MM'
+export function moverMes(mes: string, cantidad: number): string {
+  const [anio, numeroMes] = mes.split('-').map(Number)
+  return aISO(new Date(anio, numeroMes - 1 + cantidad, 1)).slice(0, 7)
+}

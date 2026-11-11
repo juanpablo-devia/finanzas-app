@@ -162,7 +162,9 @@ function App() {
             onEditar={abrirEdicionMeta}
           />
         )}
-        {pantalla === 'resumen' && <Resumen />}
+        {pantalla === 'resumen' && (
+          <Resumen movimientos={finanzas.movimientos} onTocarMovimiento={abrirEdicion} />
+        )}
       </main>
 
       {menuAbierto && <MenuAgregar onElegir={elegirOpcion} onCerrar={() => setMenuAbierto(false)} />}
