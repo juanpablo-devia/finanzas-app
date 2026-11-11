@@ -8,7 +8,9 @@ import CampoSelect from './CampoSelect'
 interface Props {
   metas: Meta[]
   tipoInicial?: TipoMovimiento
+  movimiento?: Movimiento // si viene, el formulario está en modo EDICIÓN
   onGuardar: (movimiento: Movimiento, abono: Abono | null) => void
+  onEliminar?: (movimiento: Movimiento) => void
   onCerrar: () => void
 }
 
@@ -22,14 +24,24 @@ const EJEMPLOS: Record<TipoMovimiento, string> = {
 
 const PORCENTAJES = [10, 20, 30, 50]
 
-export default function FormularioMovimiento({ metas, tipoInicial = 'gasto', onGuardar, onCerrar }: Props) {
+export default function FormularioMovimiento({
+  metas,
+  tipoInicial = 'gasto',
+  movimiento,
+  onGuardar,
+  onEliminar,
+  onCerrar,
+}: Props) {
+  const esEdicion = movimiento !== undefined
+  const tipoArranque = movimiento?.tipo ?? tipoInicial
+
   const metasActivas = metas.filter((m) => !calcularPlanMeta(m).completada)
 
-  const [tipo, setTipo] = useState<TipoMovimiento>(tipoInicial)
-  const [monto, setMonto] = useState('') // solo dígitos
-  const [descripcion, setDescripcion] = useState('')
-  const [categoria, setCategoria] = useState(CATEGORIAS[tipoInicial][0])
-  const [fecha, setFecha] = useState(hoyISO())
+  const [tipo, setTipo] = useState<TipoMovimiento>(tipoArranque)
+  const [monto, setMonto] = useState(movimiento ? String(movimiento.monto) : '') // solo dígitos
+  const [descripcion, setDescripcion] = useState(movimiento?.descripcion ?? '')
+  const [categoria, setCategoria] = useState(movimiento?.categoria ?? CATEGORIAS[tipoArranque][0])
+  const [fecha, setFecha] = useState(movimiento?.fecha ?? hoyISO())
   const [metaId, setMetaId] = useState(metasActivas[0]?.id ?? '')
   const [abono, setAbono] = useState('') // solo dígitos
 
@@ -39,7 +51,8 @@ export default function FormularioMovimiento({ metas, tipoInicial = 'gasto', onG
 
   // El abono no puede ser mayor que el ingreso ni que lo que le falta a la meta
   const valorAbono = Math.min(Number(abono), valor, planMeta?.faltante ?? 0)
-  const mostrarReparto = tipo === 'ingreso' && valor > 0
+  // El reparto a metas solo aplica al crear un ingreso nuevo
+  const mostrarReparto = !esEdicion && tipo === 'ingreso' && valor > 0
 
   function cambiarTipo(nuevo: TipoMovimiento) {
     setTipo(nuevo)
@@ -48,8 +61,8 @@ export default function FormularioMovimiento({ metas, tipoInicial = 'gasto', onG
 
   function guardar() {
     if (!valor) return
-    const movimiento: Movimiento = {
-      id: generarId(),
+    const datos: Movimiento = {
+      id: movimiento?.id ?? generarId(), // al editar conservamos el mismo id
       tipo,
       monto: valor,
       descripcion: descripcion.trim() || categoria,
@@ -59,7 +72,7 @@ export default function FormularioMovimiento({ metas, tipoInicial = 'gasto', onG
     const abonoFinal =
       mostrarReparto && metaElegida && valorAbono > 0 ? { metaId: metaElegida.id, monto: valorAbono } : null
 
-    onGuardar(movimiento, abonoFinal)
+    onGuardar(datos, abonoFinal)
   }
 
   return (
@@ -73,7 +86,7 @@ export default function FormularioMovimiento({ metas, tipoInicial = 'gasto', onG
         className="max-h-[90dvh] w-full max-w-md space-y-4 overflow-y-auto rounded-t-3xl bg-white p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] dark:bg-gray-900"
       >
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Nuevo movimiento</h2>
+          <h2 className="text-lg font-semibold">{esEdicion ? 'Editar movimiento' : 'Nuevo movimiento'}</h2>
           <button type="button" onClick={onCerrar} className="text-gray-500">
             Cancelar
           </button>
@@ -193,8 +206,18 @@ export default function FormularioMovimiento({ metas, tipoInicial = 'gasto', onG
           disabled={!valor}
           className="w-full rounded-xl bg-emerald-600 py-4 font-semibold text-white transition active:scale-95 disabled:opacity-40"
         >
-          Guardar
+          {esEdicion ? 'Guardar cambios' : 'Guardar'}
         </button>
+
+        {movimiento && onEliminar && (
+          <button
+            type="button"
+            onClick={() => onEliminar(movimiento)}
+            className="w-full py-2 text-sm font-medium text-red-500"
+          >
+            Eliminar movimiento
+          </button>
+        )}
       </form>
     </div>
   )

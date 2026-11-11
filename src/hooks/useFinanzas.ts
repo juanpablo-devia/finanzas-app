@@ -48,6 +48,10 @@ export function useFinanzas() {
     })
   }
 
+  async function actualizarMovimiento(movimiento: Movimiento) {
+    await db.movimientos.put(movimiento) // put = reemplaza el registro con el mismo id
+  }
+
   async function eliminarMovimiento(id: string) {
     await db.movimientos.delete(id)
   }
@@ -76,6 +80,7 @@ export function useFinanzas() {
     gastosMes,
     puedoGastarHoy,
     agregarMovimiento,
+    actualizarMovimiento,
     eliminarMovimiento,
     agregarMeta,
     abonarMeta,

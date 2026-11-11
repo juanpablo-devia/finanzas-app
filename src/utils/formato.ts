@@ -29,3 +29,23 @@ export function formatearFecha(iso: string): string {
   if (iso === aISO(ayer)) return 'Ayer'
   return new Date(iso + 'T00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })
 }
+// Lunes de la semana actual en 'YYYY-MM-DD' (en Colombia la semana empieza el lunes)
+export function inicioSemanaISO(fecha = new Date()): string {
+  const lunes = new Date(fecha)
+  const diasDesdeLunes = (lunes.getDay() + 6) % 7 // getDay(): domingo = 0, lunes = 1...
+  lunes.setDate(lunes.getDate() - diasDesdeLunes)
+  return aISO(lunes)
+}
+
+// "Hoy", "Ayer" o "Lunes, 9 de noviembre"
+export function formatearFechaLarga(iso: string): string {
+  const corta = formatearFecha(iso)
+  if (corta === 'Hoy' || corta === 'Ayer') return corta
+
+  const texto = new Date(iso + 'T00:00').toLocaleDateString('es-CO', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  })
+  return texto.charAt(0).toUpperCase() + texto.slice(1)
+}

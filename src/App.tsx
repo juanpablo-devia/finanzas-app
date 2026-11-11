@@ -19,6 +19,7 @@ function App() {
   const [menuAbierto, setMenuAbierto] = useState(false)
   const [formularioAbierto, setFormularioAbierto] = useState(false)
   const [tipoNuevo, setTipoNuevo] = useState<TipoMovimiento>('gasto')
+  const [movimientoEditando, setMovimientoEditando] = useState<Movimiento | null>(null)
   const [formularioMetaAbierto, setFormularioMetaAbierto] = useState(false)
   const [nombre, setNombre] = useState(() => localStorage.getItem('nombre') ?? '')
 
@@ -35,6 +36,7 @@ function App() {
       setFormularioMetaAbierto(true)
     } else {
       setTipoNuevo(opcion) // 'gasto' o 'ingreso'
+      setMovimientoEditando(null)
       setFormularioAbierto(true)
     }
   }
@@ -51,14 +53,24 @@ function App() {
   }
 
   // ---- Acciones con confirmación (la parte de "interfaz") ----
+  function abrirEdicion(m: Movimiento) {
+    setMovimientoEditando(m)
+    setFormularioAbierto(true)
+  }
+
   async function guardarMovimiento(movimiento: Movimiento, abono: Abono | null) {
-    await finanzas.agregarMovimiento(movimiento, abono)
+    if (movimientoEditando) {
+      await finanzas.actualizarMovimiento(movimiento)
+    } else {
+      await finanzas.agregarMovimiento(movimiento, abono)
+    }
     setFormularioAbierto(false)
   }
 
   async function pedirEliminarMovimiento(m: Movimiento) {
     if (window.confirm(`¿Eliminar "${m.descripcion}" por ${formatearPesos(m.monto)}?`)) {
       await finanzas.eliminarMovimiento(m.id)
+      setFormularioAbierto(false)
     }
   }
 
@@ -106,11 +118,11 @@ function App() {
             nombre={nombre}
             onCambiarNombre={cambiarNombre}
             onNavegar={navegar}
-            onTocarMovimiento={pedirEliminarMovimiento}
+            onTocarMovimiento={abrirEdicion}
           />
         )}
         {pantalla === 'movimientos' && (
-          <Movimientos movimientos={finanzas.movimientos} onTocarMovimiento={pedirEliminarMovimiento} />
+          <Movimientos movimientos={finanzas.movimientos} onTocarMovimiento={abrirEdicion} />
         )}
         {pantalla === 'metas' && (
           <Metas
@@ -141,6 +153,8 @@ function App() {
         <FormularioMovimiento
           metas={finanzas.metas}
           tipoInicial={tipoNuevo}
+          movimiento={movimientoEditando ?? undefined}
+          onEliminar={pedirEliminarMovimiento}
           onGuardar={guardarMovimiento}
           onCerrar={() => setFormularioAbierto(false)}
         />
