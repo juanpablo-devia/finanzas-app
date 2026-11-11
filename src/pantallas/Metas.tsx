@@ -5,12 +5,13 @@ import { formatearPesos } from '../utils/formato'
 interface Props {
   metas: Meta[]
   totalAhorrado: number
+  ingresoDiario: number
   onNuevaMeta: () => void
   onAbonar: (meta: Meta) => void
-  onEliminar: (meta: Meta) => void
+  onEditar: (meta: Meta) => void
 }
 
-export default function Metas({ metas, totalAhorrado, onNuevaMeta, onAbonar, onEliminar }: Props) {
+export default function Metas({ metas, totalAhorrado, ingresoDiario, onNuevaMeta, onAbonar, onEditar }: Props) {
   return (
     <>
       <div className="mb-6 flex items-center justify-between">
@@ -42,8 +43,9 @@ export default function Metas({ metas, totalAhorrado, onNuevaMeta, onAbonar, onE
               <TarjetaMeta
                 key={meta.id}
                 meta={meta}
+                ingresoDiario={ingresoDiario}
                 onAbonar={() => onAbonar(meta)}
-                onEliminar={() => onEliminar(meta)}
+                onEditar={() => onEditar(meta)}
               />
             ))}
           </div>

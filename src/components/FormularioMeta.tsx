@@ -3,9 +3,13 @@ import { EMOJIS_META, type Meta } from '../types'
 import { generarId } from '../utils/id'
 import { aISO, formatearPesos } from '../utils/formato'
 import { calcularPlanMeta } from '../utils/metas'
+import ConsejoMeta from './ConsejoMeta'
 
 interface Props {
+  meta?: Meta // si viene, el formulario está en modo EDICIÓN
+  ingresoDiario: number
   onGuardar: (meta: Meta) => void
+  onEliminar?: (meta: Meta) => void
   onCerrar: () => void
 }
 
@@ -18,20 +22,21 @@ function mananaISO(): string {
   return aISO(fecha)
 }
 
-export default function FormularioMeta({ onGuardar, onCerrar }: Props) {
-  const [nombre, setNombre] = useState('')
-  const [emoji, setEmoji] = useState(EMOJIS_META[0])
-  const [monto, setMonto] = useState('')
-  const [fechaLimite, setFechaLimite] = useState('')
+export default function FormularioMeta({ meta, ingresoDiario, onGuardar, onEliminar, onCerrar }: Props) {
+  const esEdicion = meta !== undefined
+  const [nombre, setNombre] = useState(meta?.nombre ?? '')
+  const [emoji, setEmoji] = useState(meta?.emoji ?? EMOJIS_META[0])
+  const [monto, setMonto] = useState(meta ? String(meta.montoObjetivo) : '')
+  const [fechaLimite, setFechaLimite] = useState(meta?.fechaLimite ?? '')
 
   const valida = nombre.trim() !== '' && Number(monto) > 0 && fechaLimite !== ''
 
   const nuevaMeta: Meta = {
-    id: generarId(),
+    id: meta?.id ?? generarId(), // al editar conservamos el id
     nombre: nombre.trim(),
     emoji,
     montoObjetivo: Number(monto),
-    ahorrado: 0,
+    ahorrado: meta?.ahorrado ?? 0, // al editar conservamos lo ahorrado
     fechaLimite,
   }
 
@@ -46,10 +51,10 @@ export default function FormularioMeta({ onGuardar, onCerrar }: Props) {
           e.preventDefault()
           if (valida) onGuardar(nuevaMeta)
         }}
-        className="w-full max-w-md space-y-4 rounded-t-3xl bg-white p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] dark:bg-gray-900"
+        className="max-h-[90dvh] w-full max-w-md space-y-4 overflow-y-auto rounded-t-3xl bg-white p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] dark:bg-gray-900"
       >
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Nueva meta</h2>
+          <h2 className="text-lg font-semibold">{esEdicion ? 'Editar meta' : 'Nueva meta'}</h2>
           <button type="button" onClick={onCerrar} className="text-gray-500">
             Cancelar
           </button>
@@ -96,7 +101,7 @@ export default function FormularioMeta({ onGuardar, onCerrar }: Props) {
             <span className="text-sm text-gray-500 dark:text-gray-400">¿Para cuándo?</span>
             <input
               type="date"
-              min={mananaISO()}
+              min={esEdicion ? undefined : mananaISO()}
               value={fechaLimite}
               onChange={(e) => setFechaLimite(e.target.value)}
               className={estiloCampo}
@@ -104,11 +109,18 @@ export default function FormularioMeta({ onGuardar, onCerrar }: Props) {
           </label>
         </div>
 
-        {vistaPrevia && (
-          <p className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
-            Tendrías que guardar <b>{formatearPesos(vistaPrevia.porDia)}</b> al día durante{' '}
-            {vistaPrevia.diasRestantes} días.
-          </p>
+        {vistaPrevia && !vistaPrevia.completada && (
+          <div className="space-y-2">
+            <p className="rounded-xl bg-gray-50 p-3 text-sm dark:bg-gray-800/60">
+              Tendrías que guardar <b>{formatearPesos(vistaPrevia.porDia)}</b> al día durante{' '}
+              {vistaPrevia.diasRestantes} días.
+            </p>
+            <ConsejoMeta
+              porDia={vistaPrevia.porDia}
+              faltante={vistaPrevia.faltante}
+              ingresoDiario={ingresoDiario}
+            />
+          </div>
         )}
 
         <button
@@ -116,8 +128,14 @@ export default function FormularioMeta({ onGuardar, onCerrar }: Props) {
           disabled={!valida}
           className="w-full rounded-xl bg-emerald-600 py-4 font-semibold text-white transition active:scale-95 disabled:opacity-40"
         >
-          Crear meta
+          {esEdicion ? 'Guardar cambios' : 'Crear meta'}
         </button>
+
+        {meta && onEliminar && (
+          <button type="button" onClick={() => onEliminar(meta)} className="w-full py-2 text-sm font-medium text-red-500">
+            Eliminar meta
+          </button>
+        )}
       </form>
     </div>
   )

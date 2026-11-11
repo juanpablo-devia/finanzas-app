@@ -1,14 +1,16 @@
 import type { Meta } from '../types'
 import { formatearPesos } from '../utils/formato'
 import { calcularPlanMeta } from '../utils/metas'
+import ConsejoMeta from './ConsejoMeta'
 
 interface Props {
   meta: Meta
+  ingresoDiario: number
   onAbonar: () => void
-  onEliminar: () => void
+  onEditar: () => void
 }
 
-export default function TarjetaMeta({ meta, onAbonar, onEliminar }: Props) {
+export default function TarjetaMeta({ meta, ingresoDiario, onAbonar, onEditar }: Props) {
   const plan = calcularPlanMeta(meta)
   const porcentaje = Math.round(plan.progreso * 100)
 
@@ -50,17 +52,25 @@ export default function TarjetaMeta({ meta, onAbonar, onEliminar }: Props) {
         )}
       </p>
 
+      {/* Aviso de meta realista */}
+      {!plan.completada && !plan.vencida && (
+        <div className="mt-3">
+          <ConsejoMeta porDia={plan.porDia} faltante={plan.faltante} ingresoDiario={ingresoDiario} />
+        </div>
+      )}
+
       <div className="mt-3 flex gap-2">
-        {!plan.completada && (
-          <button
-            onClick={onAbonar}
-            className="flex-1 rounded-xl bg-emerald-600 py-2 text-sm font-semibold text-white transition active:scale-95"
-          >
-            Abonar
-          </button>
-        )}
-        <button onClick={onEliminar} className="rounded-xl px-4 py-2 text-sm text-gray-500 transition active:scale-95">
-          Eliminar
+        <button
+          onClick={onAbonar}
+          className="flex-1 rounded-xl bg-emerald-600 py-2 text-sm font-semibold text-white transition active:scale-95"
+        >
+          {plan.completada ? 'Retirar' : 'Abonar'}
+        </button>
+        <button
+          onClick={onEditar}
+          className="rounded-xl bg-gray-100 px-4 py-2 text-sm font-medium text-gray-600 transition active:scale-95 dark:bg-gray-800 dark:text-gray-300"
+        >
+          Editar
         </button>
       </div>
     </article>

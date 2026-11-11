@@ -2,6 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import type { Abono, Meta, Movimiento } from '../types'
 import { hoyISO } from '../utils/formato'
+import { ingresoDiarioPromedio } from '../utils/metas'
 
 const sumar = (lista: Movimiento[]) => lista.reduce((total, m) => total + m.monto, 0)
 
@@ -33,6 +34,9 @@ export function useFinanzas() {
   // Lo de las metas ya está apartado, así que solo repartimos lo que es tuyo
   const puedoGastarHoy = Math.max(0, Math.floor(saldo / diasRestantes))
 
+  // Promedio de lo que ganas al día (para saber si una meta es realista)
+  const ingresoDiario = ingresoDiarioPromedio(movimientos)
+
   // Más recientes primero
   const ordenados = [...movimientos].sort((a, b) => b.fecha.localeCompare(a.fecha))
 
@@ -60,10 +64,15 @@ export function useFinanzas() {
     await db.metas.add(meta)
   }
 
+  async function actualizarMeta(meta: Meta) {
+    await db.metas.put(meta)
+  }
+
+  // valor positivo = abonar, valor negativo = retirar (nunca queda por debajo de 0)
   async function abonarMeta(metaId: string, valor: number) {
     await db.transaction('rw', db.metas, async () => {
       const meta = await db.metas.get(metaId)
-      if (meta) await db.metas.update(metaId, { ahorrado: meta.ahorrado + valor })
+      if (meta) await db.metas.update(metaId, { ahorrado: Math.max(0, meta.ahorrado + valor) })
     })
   }
 
@@ -79,10 +88,12 @@ export function useFinanzas() {
     ingresosMes,
     gastosMes,
     puedoGastarHoy,
+    ingresoDiario,
     agregarMovimiento,
     actualizarMovimiento,
     eliminarMovimiento,
     agregarMeta,
+    actualizarMeta,
     abonarMeta,
     eliminarMeta,
   }

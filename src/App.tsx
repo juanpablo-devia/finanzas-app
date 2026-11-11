@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import BarraNavegacion, { type Pantalla } from './components/BarraNavegacion'
 import Bienvenida from './components/Bienvenida'
+import Celebracion from './components/Celebracion'
 import FormularioMeta from './components/FormularioMeta'
 import FormularioMovimiento from './components/FormularioMovimiento'
+import HojaAbono from './components/HojaAbono'
 import MenuAgregar, { type OpcionAgregar } from './components/MenuAgregar'
 import { useFinanzas } from './hooks/useFinanzas'
 import Inicio from './pantallas/Inicio'
@@ -21,6 +23,9 @@ function App() {
   const [tipoNuevo, setTipoNuevo] = useState<TipoMovimiento>('gasto')
   const [movimientoEditando, setMovimientoEditando] = useState<Movimiento | null>(null)
   const [formularioMetaAbierto, setFormularioMetaAbierto] = useState(false)
+  const [metaEditando, setMetaEditando] = useState<Meta | null>(null)
+  const [metaAbonando, setMetaAbonando] = useState<Meta | null>(null)
+  const [metaCelebrada, setMetaCelebrada] = useState<Meta | null>(null)
   const [nombre, setNombre] = useState(() => localStorage.getItem('nombre') ?? '')
 
   // ---- Navegación ----
@@ -33,12 +38,18 @@ function App() {
   function elegirOpcion(opcion: OpcionAgregar) {
     setMenuAbierto(false)
     if (opcion === 'meta') {
-      setFormularioMetaAbierto(true)
+      abrirNuevaMeta()
     } else {
       setTipoNuevo(opcion) // 'gasto' o 'ingreso'
       setMovimientoEditando(null)
       setFormularioAbierto(true)
     }
+  }
+
+  // ---- Celebración ----
+  function celebrar(meta: Meta) {
+    setMetaCelebrada(meta)
+    setTimeout(() => setMetaCelebrada(null), 4500) // se cierra sola a los 4,5 s
   }
 
   // ---- Nombre ----
@@ -65,6 +76,10 @@ function App() {
       await finanzas.agregarMovimiento(movimiento, abono)
     }
     setFormularioAbierto(false)
+
+    // ¿El abono del ingreso completó una meta?
+    const meta = abono && finanzas.metas.find((m) => m.id === abono.metaId)
+    if (abono && meta && meta.ahorrado + abono.monto >= meta.montoObjetivo) celebrar(meta)
   }
 
   async function pedirEliminarMovimiento(m: Movimiento) {
@@ -74,30 +89,43 @@ function App() {
     }
   }
 
+  function abrirNuevaMeta() {
+    setMetaEditando(null)
+    setFormularioMetaAbierto(true)
+  }
+
+  function abrirEdicionMeta(meta: Meta) {
+    setMetaEditando(meta)
+    setFormularioMetaAbierto(true)
+  }
+
   async function guardarMeta(meta: Meta) {
-    await finanzas.agregarMeta(meta)
+    if (metaEditando) {
+      await finanzas.actualizarMeta(meta)
+    } else {
+      await finanzas.agregarMeta(meta)
+    }
     setFormularioMetaAbierto(false)
   }
 
-  async function pedirAbono(meta: Meta) {
-    const texto = window.prompt(`¿Cuánto vas a abonar a "${meta.nombre}"?`)
-    const valor = Number(texto?.replace(/\D/g, '') ?? 0)
-    if (!valor) return
-
-    if (
-      valor > finanzas.saldo &&
-      !window.confirm('Ese abono es mayor que tu saldo disponible. ¿Abonar de todas formas?')
-    ) {
-      return
-    }
+  async function confirmarAbono(valor: number) {
+    if (!metaAbonando) return
+    const meta = metaAbonando
     await finanzas.abonarMeta(meta.id, valor)
+    setMetaAbonando(null)
+
+    // Si con este abono llegó al 100%, ¡a celebrar!
+    if (valor > 0 && meta.ahorrado + valor >= meta.montoObjetivo) celebrar(meta)
   }
 
   async function pedirEliminarMeta(meta: Meta) {
     const ok = window.confirm(
       `¿Eliminar la meta "${meta.nombre}"? Lo ahorrado (${formatearPesos(meta.ahorrado)}) vuelve a tu saldo.`,
     )
-    if (ok) await finanzas.eliminarMeta(meta.id)
+    if (ok) {
+      await finanzas.eliminarMeta(meta.id)
+      setFormularioMetaAbierto(false)
+    }
   }
 
   // ---- Pantalla de bienvenida si no hay nombre ----
@@ -128,9 +156,10 @@ function App() {
           <Metas
             metas={finanzas.metas}
             totalAhorrado={finanzas.totalAhorrado}
-            onNuevaMeta={() => setFormularioMetaAbierto(true)}
-            onAbonar={pedirAbono}
-            onEliminar={pedirEliminarMeta}
+            ingresoDiario={finanzas.ingresoDiario}
+            onNuevaMeta={abrirNuevaMeta}
+            onAbonar={setMetaAbonando}
+            onEditar={abrirEdicionMeta}
           />
         )}
         {pantalla === 'resumen' && <Resumen />}
@@ -160,8 +189,23 @@ function App() {
         />
       )}
       {formularioMetaAbierto && (
-        <FormularioMeta onGuardar={guardarMeta} onCerrar={() => setFormularioMetaAbierto(false)} />
+        <FormularioMeta
+          meta={metaEditando ?? undefined}
+          ingresoDiario={finanzas.ingresoDiario}
+          onGuardar={guardarMeta}
+          onEliminar={pedirEliminarMeta}
+          onCerrar={() => setFormularioMetaAbierto(false)}
+        />
       )}
+      {metaAbonando && (
+        <HojaAbono
+          meta={metaAbonando}
+          saldo={finanzas.saldo}
+          onConfirmar={confirmarAbono}
+          onCerrar={() => setMetaAbonando(null)}
+        />
+      )}
+      {metaCelebrada && <Celebracion meta={metaCelebrada} onCerrar={() => setMetaCelebrada(null)} />}
     </>
   )
 }
