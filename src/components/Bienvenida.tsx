@@ -9,7 +9,7 @@ export default function Bienvenida({ onListo }: Props) {
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6">
-      <img src="/pwa-192x192.png" alt="" className="mb-8 h-20 w-20 rounded-3xl shadow-lg" />
+            <img src={`${import.meta.env.BASE_URL}pwa-192x192.png`} alt="" className="mb-8 h-20 w-20 rounded-3xl shadow-lg" />
 
       <h1 className="text-3xl font-bold">Bienvenido a Mis Finanzas</h1>
       <p className="mt-2 text-gray-500 dark:text-gray-400">
