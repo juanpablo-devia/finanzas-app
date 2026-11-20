@@ -1,9 +1,10 @@
 import ItemMovimiento from '../components/ItemMovimiento'
+import PorConfirmar from '../components/PorConfirmar'
 import ProximosPagos from '../components/ProximosPagos'
 import TarjetaPresupuesto from '../components/TarjetaPresupuesto'
 import type { Pantalla } from '../components/BarraNavegacion'
 import type { Finanzas } from '../hooks/useFinanzas'
-import type { Movimiento } from '../types'
+import type { Movimiento, Previsto } from '../types'
 import { formatearPesos } from '../utils/formato'
 import { calcularPlanMeta } from '../utils/metas'
 import { obtenerIniciales, saludoSegunHora } from '../utils/saludo'
@@ -15,6 +16,8 @@ interface Props {
   onEditarPresupuesto: () => void
   onNavegar: (pantalla: Pantalla) => void
   onTocarMovimiento: (movimiento: Movimiento) => void
+  onRegistrarPrevisto: (previsto: Previsto, fecha: string) => void
+  onDescartarPrevisto: (previsto: Previsto, fecha: string) => void
 }
 
 function TituloSeccion({ titulo, onVerTodo }: { titulo: string; onVerTodo: () => void }) {
@@ -35,6 +38,8 @@ export default function Inicio({
   onEditarPresupuesto,
   onNavegar,
   onTocarMovimiento,
+  onRegistrarPrevisto,
+  onDescartarPrevisto,
 }: Props) {
   const { saldo, puedoGastarHoy, totalAhorrado, ingresosMes, gastosMes, metas, movimientos } = finanzas
   const ultimos = movimientos.slice(0, 5)
@@ -67,6 +72,13 @@ export default function Inicio({
           {totalAhorrado > 0 && <p>En metas: {formatearPesos(totalAhorrado)}</p>}
         </div>
       </section>
+
+      {/* Ingresos/gastos esperados cuya fecha ya llegó */}
+      <PorConfirmar
+        previstos={finanzas.previstos}
+        onRegistrar={onRegistrarPrevisto}
+        onDescartar={onDescartarPrevisto}
+      />
 
       {/* Presupuesto de la semana */}
       <div className="mt-4">

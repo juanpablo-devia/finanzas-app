@@ -68,3 +68,18 @@ export interface Compromiso {
   metaId: string // bolsillo del que salen las cuotas, o '' si sale de tu saldo
   cuotas: Cuota[]
 }
+
+export type Frecuencia = 'una vez' | 'semanal' | 'mensual'
+
+// Plata que sabes que va a entrar o salir en el futuro
+export interface Previsto {
+  id: string
+  tipo: TipoMovimiento
+  descripcion: string // "Pago de fin de mes", "Regalos familia"
+  categoria: string
+  monto: number
+  desde: string // primera (o única) fecha 'YYYY-MM-DD'
+  frecuencia: Frecuencia
+  hasta: string // última fecha posible si se repite ('' = sin fin)
+  confirmadas: string[] // fechas que ya registraste o descartaste
+}

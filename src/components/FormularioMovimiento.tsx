@@ -10,6 +10,7 @@ interface Props {
   metas: Meta[]
   tipoInicial?: TipoMovimiento
   movimiento?: Movimiento // si viene, el formulario está en modo EDICIÓN
+  valoresIniciales?: Omit<Movimiento, 'id'> // para arrancar con datos (ej. un ingreso esperado), sin ser edición
   onGuardar: (movimiento: Movimiento, abonos: Abono[]) => void
   onEliminar?: (movimiento: Movimiento) => void
   onCerrar: () => void
@@ -30,12 +31,14 @@ export default function FormularioMovimiento({
   metas,
   tipoInicial = 'gasto',
   movimiento,
+  valoresIniciales,
   onGuardar,
   onEliminar,
   onCerrar,
 }: Props) {
   const esEdicion = movimiento !== undefined
-  const tipoArranque = movimiento?.tipo ?? tipoInicial
+  const inicial = movimiento ?? valoresIniciales
+  const tipoArranque = inicial?.tipo ?? tipoInicial
 
   // Bolsillos a los que se puede apartar: los que no se han completado, más los sin fecha (colchón)
   const metasActivas = metas.filter((m) => {
@@ -44,10 +47,10 @@ export default function FormularioMovimiento({
   })
 
   const [tipo, setTipo] = useState<TipoMovimiento>(tipoArranque)
-  const [monto, setMonto] = useState(movimiento ? String(movimiento.monto) : '') // solo dígitos
-  const [descripcion, setDescripcion] = useState(movimiento?.descripcion ?? '')
-  const [categoria, setCategoria] = useState(movimiento?.categoria ?? CATEGORIAS[tipoArranque][0])
-  const [fecha, setFecha] = useState(movimiento?.fecha ?? hoyISO())
+  const [monto, setMonto] = useState(inicial ? String(inicial.monto) : '') // solo dígitos
+  const [descripcion, setDescripcion] = useState(inicial?.descripcion ?? '')
+  const [categoria, setCategoria] = useState(inicial?.categoria ?? CATEGORIAS[tipoArranque][0])
+  const [fecha, setFecha] = useState(inicial?.fecha ?? hoyISO())
 
   // Reparto: null = todavía no lo has tocado, así que usamos el plan guardado de esa fuente
   const [repartoManual, setRepartoManual] = useState<Record<string, string> | null>(null)

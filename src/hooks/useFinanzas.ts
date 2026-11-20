@@ -9,6 +9,7 @@ import {
   type Compromiso,
   type Meta,
   type Movimiento,
+  type Previsto,
 } from '../types'
 import { totalCuotasDelMes } from '../utils/cuotas'
 import { generarId } from '../utils/id'
@@ -30,6 +31,7 @@ export function useFinanzas() {
     (a.fechaLimite || '9999').localeCompare(b.fechaLimite || '9999'),
   )
   const compromisos = useLiveQuery(() => db.compromisos.toArray(), []) ?? []
+  const previstos = useLiveQuery(() => db.previstos.orderBy('id').toArray(), []) ?? []
   const [presupuestoSemanal, setPresupuestoSemanal] = useState(
     () => Number(localStorage.getItem('presupuestoSemanal')) || PRESUPUESTO_SEMANAL_INICIAL,
   )
@@ -176,6 +178,24 @@ export function useFinanzas() {
     })
   }
 
+  async function guardarPrevisto(previsto: Previsto) {
+    await db.previstos.put(previsto)
+  }
+
+  async function eliminarPrevisto(id: string) {
+    await db.previstos.delete(id)
+  }
+
+  // Marca una fecha de un previsto como ya registrada (o descartada si no llegó)
+  async function confirmarPrevisto(id: string, fecha: string) {
+    await db.transaction('rw', db.previstos, async () => {
+      const previsto = await db.previstos.get(id)
+      if (previsto && !previsto.confirmadas.includes(fecha)) {
+        await db.previstos.update(id, { confirmadas: [...previsto.confirmadas, fecha] })
+      }
+    })
+  }
+
   async function eliminarMeta(id: string) {
     await db.metas.delete(id)
   }
@@ -184,6 +204,8 @@ export function useFinanzas() {
     movimientos: ordenados,
     metas,
     compromisos,
+    previstos,
+    restanteSemana,
     ingresoFijoMensual,
     cuotasDelMes,
     saldo,
@@ -208,6 +230,9 @@ export function useFinanzas() {
     eliminarCompromiso,
     pagarCuota,
     deshacerPagoCuota,
+    guardarPrevisto,
+    eliminarPrevisto,
+    confirmarPrevisto,
   }
 }
 

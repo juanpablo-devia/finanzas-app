@@ -2,7 +2,9 @@ import { useState } from 'react'
 import GraficoBarrasDiarias from '../components/GraficoBarrasDiarias'
 import GraficoDona, { type Porcion } from '../components/GraficoDona'
 import ItemMovimiento from '../components/ItemMovimiento'
-import type { Movimiento } from '../types'
+import Proyeccion from '../components/Proyeccion'
+import type { Finanzas } from '../hooks/useFinanzas'
+import type { Movimiento, Previsto } from '../types'
 import { formatearPesos, hoyISO, moverMes, nombreMes } from '../utils/formato'
 
 const sumar = (lista: Movimiento[]) => lista.reduce((total, m) => total + m.monto, 0)
@@ -10,12 +12,13 @@ const diaDe = (fecha: string) => Number(fecha.slice(8)) // '2026-11-09' → 9
 
 const tarjeta = 'rounded-2xl bg-white p-4 shadow-sm dark:bg-gray-900'
 
-interface Props {
+interface PropsMes {
   movimientos: Movimiento[]
   onTocarMovimiento: (movimiento: Movimiento) => void
 }
 
-export default function Resumen({ movimientos, onTocarMovimiento }: Props) {
+// Vista "Este mes": totales, dona, barras y gastos más grandes
+function ResumenMes({ movimientos, onTocarMovimiento }: PropsMes) {
   const mesActual = hoyISO().slice(0, 7)
   const [mes, setMes] = useState(mesActual)
   const esMesActual = mes === mesActual
@@ -58,8 +61,6 @@ export default function Resumen({ movimientos, onTocarMovimiento }: Props) {
 
   return (
     <>
-      <h1 className="mb-4 text-2xl font-bold">Resumen</h1>
-
       {/* Selector de mes */}
       <div className="mb-4 flex items-center justify-between rounded-2xl bg-white p-2 shadow-sm dark:bg-gray-900">
         <button
@@ -167,6 +168,50 @@ export default function Resumen({ movimientos, onTocarMovimiento }: Props) {
             </section>
           )}
         </div>
+      )}
+    </>
+  )
+}
+
+type Vista = 'mes' | 'proyeccion'
+
+interface Props {
+  finanzas: Finanzas
+  onTocarMovimiento: (movimiento: Movimiento) => void
+  onNuevoPrevisto: () => void
+  onEditarPrevisto: (previsto: Previsto) => void
+}
+
+export default function Resumen({ finanzas, onTocarMovimiento, onNuevoPrevisto, onEditarPrevisto }: Props) {
+  const [vista, setVista] = useState<Vista>('mes')
+
+  return (
+    <>
+      <h1 className="mb-4 text-2xl font-bold">Resumen</h1>
+
+      <div className="mb-4 grid grid-cols-2 gap-1 rounded-xl bg-gray-200/60 p-1 dark:bg-gray-800">
+        {(
+          [
+            { id: 'mes', etiqueta: 'Este mes' },
+            { id: 'proyeccion', etiqueta: 'Proyección 📈' },
+          ] as const
+        ).map((v) => (
+          <button
+            key={v.id}
+            onClick={() => setVista(v.id)}
+            className={`rounded-lg py-2 text-sm font-medium transition ${
+              vista === v.id ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-white' : 'text-gray-500'
+            }`}
+          >
+            {v.etiqueta}
+          </button>
+        ))}
+      </div>
+
+      {vista === 'mes' ? (
+        <ResumenMes movimientos={finanzas.movimientos} onTocarMovimiento={onTocarMovimiento} />
+      ) : (
+        <Proyeccion finanzas={finanzas} onNuevoPrevisto={onNuevoPrevisto} onEditarPrevisto={onEditarPrevisto} />
       )}
     </>
   )

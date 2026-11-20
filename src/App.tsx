@@ -3,6 +3,7 @@ import BarraNavegacion, { type Pantalla } from './components/BarraNavegacion'
 import Bienvenida from './components/Bienvenida'
 import Celebracion from './components/Celebracion'
 import FormularioCompromiso from './components/FormularioCompromiso'
+import FormularioPrevisto from './components/FormularioPrevisto'
 import FormularioMeta from './components/FormularioMeta'
 import FormularioMovimiento from './components/FormularioMovimiento'
 import HojaAbono from './components/HojaAbono'
@@ -12,7 +13,7 @@ import Inicio from './pantallas/Inicio'
 import Metas from './pantallas/Metas'
 import Movimientos from './pantallas/Movimientos'
 import Resumen from './pantallas/Resumen'
-import type { Abono, Compromiso, Cuota, Meta, Movimiento, TipoMovimiento } from './types'
+import type { Abono, Compromiso, Cuota, Meta, Movimiento, Previsto, TipoMovimiento } from './types'
 import { formatearPesos } from './utils/formato'
 
 function App() {
@@ -29,6 +30,10 @@ function App() {
   const [celebracion, setCelebracion] = useState<{ emoji: string; mensaje: string } | null>(null)
   const [formularioCompromisoAbierto, setFormularioCompromisoAbierto] = useState(false)
   const [compromisoEditando, setCompromisoEditando] = useState<Compromiso | null>(null)
+  const [formularioPrevistoAbierto, setFormularioPrevistoAbierto] = useState(false)
+  const [previstoEditando, setPrevistoEditando] = useState<Previsto | null>(null)
+  // Cuando registras un ingreso esperado desde "¿Ya te llegó?"
+  const [previstoEnCurso, setPrevistoEnCurso] = useState<{ previsto: Previsto; fecha: string } | null>(null)
   const [nombre, setNombre] = useState(() => localStorage.getItem('nombre') ?? '')
 
   // ---- Navegación ----
@@ -47,6 +52,7 @@ function App() {
     } else {
       setTipoNuevo(opcion) // 'gasto' o 'ingreso'
       setMovimientoEditando(null)
+      setPrevistoEnCurso(null)
       setFormularioAbierto(true)
     }
   }
@@ -81,6 +87,7 @@ function App() {
   // ---- Acciones con confirmación (la parte de "interfaz") ----
   function abrirEdicion(m: Movimiento) {
     setMovimientoEditando(m)
+    setPrevistoEnCurso(null)
     setFormularioAbierto(true)
   }
 
@@ -91,6 +98,12 @@ function App() {
       await finanzas.agregarMovimiento(movimiento, abonos)
     }
     setFormularioAbierto(false)
+
+    // Si venía de un ingreso esperado, esa fecha queda confirmada
+    if (previstoEnCurso) {
+      await finanzas.confirmarPrevisto(previstoEnCurso.previsto.id, previstoEnCurso.fecha)
+      setPrevistoEnCurso(null)
+    }
 
     // ¿Algún abono completó una meta? (solo celebramos si ANTES no estaba completa)
     const completada = abonos
@@ -198,6 +211,43 @@ function App() {
     if (pendientes === 1) celebrar(compromiso.emoji, `Terminaste de pagar "${compromiso.nombre}"`)
   }
 
+  // ---- Ingresos y gastos esperados ----
+  function abrirNuevoPrevisto() {
+    setPrevistoEditando(null)
+    setFormularioPrevistoAbierto(true)
+  }
+
+  function abrirEdicionPrevisto(previsto: Previsto) {
+    setPrevistoEditando(previsto)
+    setFormularioPrevistoAbierto(true)
+  }
+
+  async function guardarPrevisto(previsto: Previsto) {
+    await finanzas.guardarPrevisto(previsto)
+    setFormularioPrevistoAbierto(false)
+  }
+
+  async function pedirEliminarPrevisto(previsto: Previsto) {
+    if (window.confirm(`¿Quitar "${previsto.descripcion}" de lo que esperas?`)) {
+      await finanzas.eliminarPrevisto(previsto.id)
+      setFormularioPrevistoAbierto(false)
+    }
+  }
+
+  // "Sí, registrar": abre el formulario con los datos ya llenos
+  function registrarPrevisto(previsto: Previsto, fecha: string) {
+    setPrevistoEnCurso({ previsto, fecha })
+    setMovimientoEditando(null)
+    setFormularioAbierto(true)
+  }
+
+  async function descartarPrevisto(previsto: Previsto, fecha: string) {
+    const pregunta = previsto.tipo === 'ingreso' ? '¿No te llegó' : '¿No lo pagaste'
+    if (window.confirm(`${pregunta} "${previsto.descripcion}"? Se quita de la lista y de la proyección.`)) {
+      await finanzas.confirmarPrevisto(previsto.id, fecha)
+    }
+  }
+
   // ---- Pantalla de bienvenida si no hay nombre ----
   if (!nombre) {
     return <Bienvenida onListo={guardarNombre} />
@@ -218,6 +268,8 @@ function App() {
             onEditarPresupuesto={editarPresupuesto}
             onNavegar={navegar}
             onTocarMovimiento={abrirEdicion}
+            onRegistrarPrevisto={registrarPrevisto}
+            onDescartarPrevisto={descartarPrevisto}
           />
         )}
         {pantalla === 'movimientos' && (
@@ -240,7 +292,12 @@ function App() {
           />
         )}
         {pantalla === 'resumen' && (
-          <Resumen movimientos={finanzas.movimientos} onTocarMovimiento={abrirEdicion} />
+          <Resumen
+            finanzas={finanzas}
+            onTocarMovimiento={abrirEdicion}
+            onNuevoPrevisto={abrirNuevoPrevisto}
+            onEditarPrevisto={abrirEdicionPrevisto}
+          />
         )}
       </main>
 
@@ -262,6 +319,17 @@ function App() {
           metas={finanzas.metas}
           tipoInicial={tipoNuevo}
           movimiento={movimientoEditando ?? undefined}
+          valoresIniciales={
+            previstoEnCurso
+              ? {
+                  tipo: previstoEnCurso.previsto.tipo,
+                  monto: previstoEnCurso.previsto.monto,
+                  descripcion: previstoEnCurso.previsto.descripcion,
+                  categoria: previstoEnCurso.previsto.categoria,
+                  fecha: previstoEnCurso.fecha,
+                }
+              : undefined
+          }
           onEliminar={pedirEliminarMovimiento}
           onGuardar={guardarMovimiento}
           onCerrar={() => setFormularioAbierto(false)}
@@ -291,6 +359,14 @@ function App() {
           onGuardar={guardarCompromiso}
           onEliminar={pedirEliminarCompromiso}
           onCerrar={() => setFormularioCompromisoAbierto(false)}
+        />
+      )}
+      {formularioPrevistoAbierto && (
+        <FormularioPrevisto
+          previsto={previstoEditando ?? undefined}
+          onGuardar={guardarPrevisto}
+          onEliminar={pedirEliminarPrevisto}
+          onCerrar={() => setFormularioPrevistoAbierto(false)}
         />
       )}
       {celebracion && (
