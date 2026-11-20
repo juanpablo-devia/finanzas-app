@@ -15,15 +15,21 @@ interface Props {
 
 export default function HojaAbono({ meta, saldo, onConfirmar, onCerrar }: Props) {
   const plan = calcularPlanMeta(meta)
-  const [modo, setModo] = useState<Modo>(plan.completada ? 'retirar' : 'abonar')
+  const [modo, setModo] = useState<Modo>(plan.completada && !plan.sinFecha ? 'retirar' : 'abonar')
   const [monto, setMonto] = useState('') // solo dígitos
 
-  // Lo máximo que tiene sentido mover
-  const maximo = modo === 'abonar' ? plan.faltante : meta.ahorrado
+  // Lo máximo que tiene sentido mover (a una meta sin fecha, como el colchón, se le puede sumar sin tope)
+  const maximo = modo === 'abonar' ? (plan.sinFecha ? Infinity : plan.faltante) : meta.ahorrado
   const valor = Math.min(Number(monto), maximo)
 
   const atajos =
-    modo === 'abonar'
+    modo === 'abonar' && plan.sinFecha
+      ? [
+          { etiqueta: 'Lo que falta', valor: plan.faltante },
+          { etiqueta: 'Sumar', valor: 50000 },
+          { etiqueta: 'Sumar', valor: 100000 },
+        ]
+      : modo === 'abonar'
       ? [
           { etiqueta: 'Lo de hoy', valor: plan.porDia },
           { etiqueta: 'Lo de la semana', valor: plan.porSemana },
@@ -76,7 +82,7 @@ export default function HojaAbono({ meta, saldo, onConfirmar, onCerrar }: Props)
               <button
                 key={m}
                 type="button"
-                disabled={m === 'abonar' && plan.completada}
+                disabled={m === 'abonar' && plan.completada && !plan.sinFecha}
                 onClick={() => cambiarModo(m)}
                 className={`rounded-lg py-2 text-sm font-medium capitalize transition disabled:opacity-30 ${
                   modo === m ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-700 dark:text-white' : 'text-gray-500'
@@ -106,7 +112,7 @@ export default function HojaAbono({ meta, saldo, onConfirmar, onCerrar }: Props)
             .filter((a) => a.valor > 0)
             .map((a) => (
               <button
-                key={a.etiqueta}
+                key={`${a.etiqueta}-${a.valor}`}
                 type="button"
                 onClick={() => setMonto(String(a.valor))}
                 className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition active:scale-95 dark:bg-emerald-950 dark:text-emerald-300"

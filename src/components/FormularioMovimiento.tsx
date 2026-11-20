@@ -3,13 +3,14 @@ import { CATEGORIAS, type Abono, type Meta, type Movimiento, type TipoMovimiento
 import { generarId } from '../utils/id'
 import { formatearPesos, hoyISO } from '../utils/formato'
 import { calcularPlanMeta } from '../utils/metas'
+import { guardarPlantilla, leerPlantilla } from '../utils/plantillas'
 import CampoSelect from './CampoSelect'
 
 interface Props {
   metas: Meta[]
   tipoInicial?: TipoMovimiento
   movimiento?: Movimiento // si viene, el formulario está en modo EDICIÓN
-  onGuardar: (movimiento: Movimiento, abono: Abono | null) => void
+  onGuardar: (movimiento: Movimiento, abonos: Abono[]) => void
   onEliminar?: (movimiento: Movimiento) => void
   onCerrar: () => void
 }
@@ -22,7 +23,8 @@ const EJEMPLOS: Record<TipoMovimiento, string> = {
   ingreso: 'Ej: Pago de la semana',
 }
 
-const PORCENTAJES = [10, 20, 30, 50]
+const redondearMil = (n: number) => Math.round(n / 1000) * 1000
+const formatearDigitos = (digitos: string) => (digitos ? Number(digitos).toLocaleString('es-CO') : '')
 
 export default function FormularioMovimiento({
   metas,
@@ -35,24 +37,48 @@ export default function FormularioMovimiento({
   const esEdicion = movimiento !== undefined
   const tipoArranque = movimiento?.tipo ?? tipoInicial
 
-  const metasActivas = metas.filter((m) => !calcularPlanMeta(m).completada)
+  // Bolsillos a los que se puede apartar: los que no se han completado, más los sin fecha (colchón)
+  const metasActivas = metas.filter((m) => {
+    const plan = calcularPlanMeta(m)
+    return !plan.completada || plan.sinFecha
+  })
 
   const [tipo, setTipo] = useState<TipoMovimiento>(tipoArranque)
   const [monto, setMonto] = useState(movimiento ? String(movimiento.monto) : '') // solo dígitos
   const [descripcion, setDescripcion] = useState(movimiento?.descripcion ?? '')
   const [categoria, setCategoria] = useState(movimiento?.categoria ?? CATEGORIAS[tipoArranque][0])
   const [fecha, setFecha] = useState(movimiento?.fecha ?? hoyISO())
-  const [metaId, setMetaId] = useState(metasActivas[0]?.id ?? '')
-  const [abono, setAbono] = useState('') // solo dígitos
+
+  // Reparto: null = todavía no lo has tocado, así que usamos el plan guardado de esa fuente
+  const [repartoManual, setRepartoManual] = useState<Record<string, string> | null>(null)
+  const [recordar, setRecordar] = useState(true)
 
   const valor = Number(monto)
-  const metaElegida = metasActivas.find((m) => m.id === metaId)
-  const planMeta = metaElegida ? calcularPlanMeta(metaElegida) : null
+  const mostrarReparto = !esEdicion && tipo === 'ingreso' && valor > 0 && metasActivas.length > 0
 
-  // El abono no puede ser mayor que el ingreso ni que lo que le falta a la meta
-  const valorAbono = Math.min(Number(abono), valor, planMeta?.faltante ?? 0)
-  // El reparto a metas solo aplica al crear un ingreso nuevo
-  const mostrarReparto = !esEdicion && tipo === 'ingreso' && valor > 0
+  // ---- Cálculo del reparto ----
+  const plantilla = leerPlantilla(categoria)
+  const sugerido: Record<string, number> = {}
+  for (const meta of metasActivas) {
+    sugerido[meta.id] = redondearMil(valor * (plantilla?.[meta.id] ?? 0))
+  }
+
+  // Lo que se va a apartar en cada bolsillo, sin pasarse de lo que le falta (salvo los sin fecha)
+  const apartar: Record<string, number> = {}
+  for (const meta of metasActivas) {
+    const pedido = repartoManual ? Number(repartoManual[meta.id] ?? 0) : sugerido[meta.id]
+    const plan = calcularPlanMeta(meta)
+    apartar[meta.id] = plan.sinFecha ? pedido : Math.min(pedido, plan.faltante)
+  }
+  const totalApartado = Object.values(apartar).reduce((t, v) => t + v, 0)
+  const paraTi = valor - totalApartado
+  const seExcede = mostrarReparto && paraTi < 0
+
+  function cambiarApartado(metaId: string, digitos: string) {
+    // La primera vez que tocas un valor, copiamos lo sugerido para no perderlo
+    const base = repartoManual ?? Object.fromEntries(Object.entries(sugerido).map(([id, v]) => [id, String(v)]))
+    setRepartoManual({ ...base, [metaId]: digitos })
+  }
 
   function cambiarTipo(nuevo: TipoMovimiento) {
     setTipo(nuevo)
@@ -64,7 +90,8 @@ export default function FormularioMovimiento({
   const opcionesCategoria = CATEGORIAS[tipo].includes(categoria) ? CATEGORIAS[tipo] : [categoria, ...CATEGORIAS[tipo]]
 
   function guardar() {
-    if (!valor) return
+    if (!valor || seExcede) return
+
     const datos: Movimiento = {
       id: movimiento?.id ?? generarId(), // al editar conservamos el mismo id
       tipo,
@@ -73,10 +100,17 @@ export default function FormularioMovimiento({
       categoria,
       fecha,
     }
-    const abonoFinal =
-      mostrarReparto && metaElegida && valorAbono > 0 ? { metaId: metaElegida.id, monto: valorAbono } : null
 
-    onGuardar(datos, abonoFinal)
+    const abonos: Abono[] = mostrarReparto
+      ? metasActivas.map((m) => ({ metaId: m.id, monto: apartar[m.id] })).filter((a) => a.monto > 0)
+      : []
+
+    // Si ajustaste el reparto a mano y quieres recordarlo, lo guardamos como plan de esta fuente
+    if (mostrarReparto && repartoManual && recordar) {
+      guardarPlantilla(categoria, Object.fromEntries(abonos.map((a) => [a.metaId, a.monto / valor])))
+    }
+
+    onGuardar(datos, abonos)
   }
 
   return (
@@ -120,61 +154,110 @@ export default function FormularioMovimiento({
             <input
               inputMode="numeric"
               placeholder="0"
-              value={monto ? Number(monto).toLocaleString('es-CO') : ''}
+              value={formatearDigitos(monto)}
               onChange={(e) => setMonto(e.target.value.replace(/\D/g, ''))}
               className="w-full bg-transparent px-2 py-3 text-2xl font-semibold outline-none"
             />
           </div>
         </label>
 
-        {/* Reparto del ingreso */}
-        {mostrarReparto && metaElegida && planMeta && (
-          <div className="space-y-3 rounded-2xl bg-emerald-50 p-4 dark:bg-emerald-950/60">
-            <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">
-              🎯 ¿Cuánto apartas para tu meta?
-            </p>
+        {/* Categoría (o fuente) y fecha */}
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block">
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              {tipo === 'ingreso' ? '¿De dónde viene?' : 'Categoría'}
+            </span>
+            <CampoSelect value={categoria} onChange={(e) => setCategoria(e.target.value)}>
+              {opcionesCategoria.map((c) => (
+                <option key={c}>{c}</option>
+              ))}
+            </CampoSelect>
+          </label>
+          <label className="block">
+            <span className="text-sm text-gray-500 dark:text-gray-400">Fecha</span>
+            <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className={estiloCampo} />
+          </label>
+        </div>
 
-            {metasActivas.length > 1 && (
-              <CampoSelect value={metaId} onChange={(e) => setMetaId(e.target.value)}>
-                {metasActivas.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.emoji} {m.nombre}
-                  </option>
-                ))}
-              </CampoSelect>
+        {/* Reparto del ingreso entre bolsillos */}
+        {mostrarReparto && (
+          <div className="space-y-3 rounded-2xl bg-emerald-50 p-4 dark:bg-emerald-950/60">
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">
+                💰 ¿Cuánto apartas para cada bolsillo?
+              </p>
+              {plantilla && repartoManual && (
+                <button
+                  type="button"
+                  onClick={() => setRepartoManual(null)}
+                  className="shrink-0 text-xs font-medium text-emerald-700 dark:text-emerald-300"
+                >
+                  Usar mi plan ↺
+                </button>
+              )}
+            </div>
+
+            {plantilla && !repartoManual && (
+              <p className="text-xs text-emerald-700 dark:text-emerald-300">
+                ✨ Llené los valores con tu plan para ingresos de <b>{categoria}</b>. Puedes ajustarlos.
+              </p>
             )}
 
-            <div className="flex gap-2">
-              {PORCENTAJES.map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setAbono(String(Math.round((valor * p) / 100)))}
-                  className="flex-1 rounded-lg bg-white py-2 text-sm font-medium transition active:scale-95 dark:bg-gray-800"
-                >
-                  {p}%
-                </button>
-              ))}
-            </div>
+            <ul className="space-y-2">
+              {metasActivas.map((meta) => {
+                const plan = calcularPlanMeta(meta)
+                const pedido = repartoManual ? Number(repartoManual[meta.id] ?? 0) : sugerido[meta.id]
+                const recortado = !plan.sinFecha && pedido > plan.faltante
+                return (
+                  <li key={meta.id} className="flex items-center gap-3">
+                    <span className="text-xl">{meta.emoji}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{meta.nombre}</p>
+                      <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                        {plan.sinFecha
+                          ? `Tienes ${formatearPesos(meta.ahorrado)}`
+                          : `Le faltan ${formatearPesos(plan.faltante)}`}
+                        {recortado && ' · se ajustó a lo que falta'}
+                      </p>
+                    </div>
+                    <div className="flex w-32 items-center rounded-lg bg-white px-2 dark:bg-gray-800">
+                      <span className="text-sm text-gray-400">$</span>
+                      <input
+                        inputMode="numeric"
+                        placeholder="0"
+                        aria-label={`Apartar para ${meta.nombre}`}
+                        value={formatearDigitos(repartoManual ? (repartoManual[meta.id] ?? '') : String(sugerido[meta.id] || ''))}
+                        onChange={(e) => cambiarApartado(meta.id, e.target.value.replace(/\D/g, ''))}
+                        className="w-full bg-transparent px-1 py-2 text-right text-base outline-none"
+                      />
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
 
-            <input
-              inputMode="numeric"
-              placeholder="O escribe un valor"
-              value={abono ? '$ ' + Number(abono).toLocaleString('es-CO') : ''}
-              onChange={(e) => setAbono(e.target.value.replace(/\D/g, ''))}
-              className={estiloCampo}
-            />
-
-            <div className="flex justify-between text-sm">
-              <span className="text-emerald-800 dark:text-emerald-200">
-                {metaElegida.emoji} {metaElegida.nombre}: {formatearPesos(valorAbono)}
+            <div className="flex justify-between border-t border-emerald-200 pt-3 text-sm dark:border-emerald-900">
+              <span className="text-emerald-800 dark:text-emerald-200">A bolsillos: {formatearPesos(totalApartado)}</span>
+              <span className={`font-semibold ${seExcede ? 'text-red-500' : ''}`}>
+                Para ti: {formatearPesos(paraTi)}
               </span>
-              <span className="font-semibold">Para ti: {formatearPesos(valor - valorAbono)}</span>
             </div>
 
-            <p className="text-xs text-emerald-700 dark:text-emerald-300">
-              Para cumplirla a tiempo necesitas {formatearPesos(planMeta.porDia)} al día.
-            </p>
+            {seExcede && (
+              <p className="text-xs text-red-500">Estás apartando más de lo que te entró. Ajusta los valores.</p>
+            )}
+
+            {repartoManual && (
+              <label className="flex items-center gap-2 text-xs text-emerald-800 dark:text-emerald-200">
+                <input
+                  type="checkbox"
+                  checked={recordar}
+                  onChange={(e) => setRecordar(e.target.checked)}
+                  className="h-4 w-4 accent-emerald-600"
+                />
+                Recordar este reparto para los próximos ingresos de {categoria}
+              </label>
+            )}
           </div>
         )}
 
@@ -189,25 +272,9 @@ export default function FormularioMovimiento({
           />
         </label>
 
-        {/* Categoría y fecha */}
-        <div className="grid grid-cols-2 gap-3">
-          <label className="block">
-            <span className="text-sm text-gray-500 dark:text-gray-400">Categoría</span>
-            <CampoSelect value={categoria} onChange={(e) => setCategoria(e.target.value)}>
-              {opcionesCategoria.map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </CampoSelect>
-          </label>
-          <label className="block">
-            <span className="text-sm text-gray-500 dark:text-gray-400">Fecha</span>
-            <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className={estiloCampo} />
-          </label>
-        </div>
-
         <button
           type="submit"
-          disabled={!valor}
+          disabled={!valor || seExcede}
           className="w-full rounded-xl bg-emerald-600 py-4 font-semibold text-white transition active:scale-95 disabled:opacity-40"
         >
           {esEdicion ? 'Guardar cambios' : 'Guardar'}

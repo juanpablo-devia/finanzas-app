@@ -28,8 +28,9 @@ export default function FormularioMeta({ meta, ingresoDiario, onGuardar, onElimi
   const [emoji, setEmoji] = useState(meta?.emoji ?? EMOJIS_META[0])
   const [monto, setMonto] = useState(meta ? String(meta.montoObjetivo) : '')
   const [fechaLimite, setFechaLimite] = useState(meta?.fechaLimite ?? '')
+  const [sinFecha, setSinFecha] = useState(meta ? !meta.fechaLimite : false)
 
-  const valida = nombre.trim() !== '' && Number(monto) > 0 && fechaLimite !== ''
+  const valida = nombre.trim() !== '' && Number(monto) > 0 && (sinFecha || fechaLimite !== '')
 
   const nuevaMeta: Meta = {
     id: meta?.id ?? generarId(), // al editar conservamos el id
@@ -37,7 +38,7 @@ export default function FormularioMeta({ meta, ingresoDiario, onGuardar, onElimi
     emoji,
     montoObjetivo: Number(monto),
     ahorrado: meta?.ahorrado ?? 0, // al editar conservamos lo ahorrado
-    fechaLimite,
+    fechaLimite: sinFecha ? '' : fechaLimite,
   }
 
   // Vista previa en vivo de cuánto tendría que guardar
@@ -88,7 +89,9 @@ export default function FormularioMeta({ meta, ingresoDiario, onGuardar, onElimi
 
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
-            <span className="text-sm text-gray-500 dark:text-gray-400">¿Cuánto necesitas?</span>
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              {sinFecha ? 'Mínimo a mantener' : '¿Cuánto necesitas?'}
+            </span>
             <input
               inputMode="numeric"
               placeholder="$ 0"
@@ -102,14 +105,25 @@ export default function FormularioMeta({ meta, ingresoDiario, onGuardar, onElimi
             <input
               type="date"
               min={esEdicion ? undefined : mananaISO()}
-              value={fechaLimite}
+              value={sinFecha ? '' : fechaLimite}
+              disabled={sinFecha}
               onChange={(e) => setFechaLimite(e.target.value)}
-              className={estiloCampo}
+              className={`${estiloCampo} disabled:opacity-40`}
             />
           </label>
         </div>
 
-        {vistaPrevia && !vistaPrevia.completada && (
+        <label className="flex items-center gap-3 text-sm">
+          <input
+            type="checkbox"
+            checked={sinFecha}
+            onChange={(e) => setSinFecha(e.target.checked)}
+            className="h-5 w-5 accent-emerald-600"
+          />
+          Sin fecha límite (por ejemplo, un colchón de emergencia)
+        </label>
+
+        {vistaPrevia && !vistaPrevia.completada && !vistaPrevia.sinFecha && (
           <div className="space-y-2">
             <p className="rounded-xl bg-gray-50 p-3 text-sm dark:bg-gray-800/60">
               Tendrías que guardar <b>{formatearPesos(vistaPrevia.porDia)}</b> al día durante{' '}

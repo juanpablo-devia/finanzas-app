@@ -14,7 +14,11 @@ const sumar = (lista: Movimiento[]) => lista.reduce((total, m) => total + m.mont
  */
 export function useFinanzas() {
   const movimientos = useLiveQuery(() => db.movimientos.toArray(), []) ?? []
-  const metas = useLiveQuery(() => db.metas.orderBy('fechaLimite').toArray(), []) ?? []
+  const metasGuardadas = useLiveQuery(() => db.metas.orderBy('fechaLimite').toArray(), []) ?? []
+  // Por fecha límite, y las que no tienen fecha (como el colchón) al final
+  const metas = [...metasGuardadas].sort((a, b) =>
+    (a.fechaLimite || '9999').localeCompare(b.fechaLimite || '9999'),
+  )
   const [presupuestoSemanal, setPresupuestoSemanal] = useState(
     () => Number(localStorage.getItem('presupuestoSemanal')) || PRESUPUESTO_SEMANAL_INICIAL,
   )
@@ -59,11 +63,11 @@ export function useFinanzas() {
     setPresupuestoSemanal(valor)
   }
 
-  async function agregarMovimiento(nuevo: Movimiento, abono: Abono | null) {
-    // Transacción: o se guardan las dos cosas, o ninguna
+  async function agregarMovimiento(nuevo: Movimiento, abonos: Abono[]) {
+    // Transacción: o se guarda todo (el ingreso y cada abono), o nada
     await db.transaction('rw', db.movimientos, db.metas, async () => {
       await db.movimientos.add(nuevo)
-      if (abono) {
+      for (const abono of abonos) {
         const meta = await db.metas.get(abono.metaId)
         if (meta) await db.metas.update(meta.id, { ahorrado: meta.ahorrado + abono.monto })
       }

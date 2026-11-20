@@ -79,17 +79,22 @@ function App() {
     setFormularioAbierto(true)
   }
 
-  async function guardarMovimiento(movimiento: Movimiento, abono: Abono | null) {
+  async function guardarMovimiento(movimiento: Movimiento, abonos: Abono[]) {
     if (movimientoEditando) {
       await finanzas.actualizarMovimiento(movimiento)
     } else {
-      await finanzas.agregarMovimiento(movimiento, abono)
+      await finanzas.agregarMovimiento(movimiento, abonos)
     }
     setFormularioAbierto(false)
 
-    // ¿El abono del ingreso completó una meta?
-    const meta = abono && finanzas.metas.find((m) => m.id === abono.metaId)
-    if (abono && meta && meta.ahorrado + abono.monto >= meta.montoObjetivo) celebrar(meta)
+    // ¿Algún abono completó una meta? (solo celebramos si ANTES no estaba completa)
+    const completada = abonos
+      .map((a) => ({ abono: a, meta: finanzas.metas.find((m) => m.id === a.metaId) }))
+      .find(
+        ({ abono, meta }) =>
+          meta && meta.ahorrado < meta.montoObjetivo && meta.ahorrado + abono.monto >= meta.montoObjetivo,
+      )
+    if (completada?.meta) celebrar(completada.meta)
   }
 
   async function pedirEliminarMovimiento(m: Movimiento) {
@@ -125,7 +130,9 @@ function App() {
     setMetaAbonando(null)
 
     // Si con este abono llegó al 100%, ¡a celebrar!
-    if (valor > 0 && meta.ahorrado + valor >= meta.montoObjetivo) celebrar(meta)
+    if (valor > 0 && meta.ahorrado < meta.montoObjetivo && meta.ahorrado + valor >= meta.montoObjetivo) {
+      celebrar(meta)
+    }
   }
 
   async function pedirEliminarMeta(meta: Meta) {

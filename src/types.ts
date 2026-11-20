@@ -38,7 +38,7 @@ export interface Meta {
   emoji: string
   montoObjetivo: number
   ahorrado: number
-  fechaLimite: string // 'YYYY-MM-DD'
+  fechaLimite: string // 'YYYY-MM-DD', o '' si no tiene fecha (ej. el colchón)
 }
 
 export const EMOJIS_META = ['🎯', '🎁', '✈️', '🚗', '💻', '🎓', '🏠', '💍']

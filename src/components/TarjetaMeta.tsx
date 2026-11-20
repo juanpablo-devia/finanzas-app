@@ -40,7 +40,15 @@ export default function TarjetaMeta({ meta, ingresoDiario, onAbonar, onEditar }:
       </div>
 
       <p className="mt-3 text-sm text-gray-600 dark:text-gray-300">
-        {plan.completada ? (
+        {plan.sinFecha ? (
+          plan.completada ? (
+            '✅ Ya tienes tu mínimo. Todo lo que sumes es extra.'
+          ) : (
+            <>
+              Te faltan <b>{formatearPesos(plan.faltante)}</b> para llegar a tu mínimo.
+            </>
+          )
+        ) : plan.completada ? (
           '🎉 ¡Meta cumplida!'
         ) : plan.vencida ? (
           `⏰ Se pasó la fecha. Te faltan ${formatearPesos(plan.faltante)}`
@@ -53,7 +61,7 @@ export default function TarjetaMeta({ meta, ingresoDiario, onAbonar, onEditar }:
       </p>
 
       {/* Aviso de meta realista */}
-      {!plan.completada && !plan.vencida && (
+      {!plan.completada && !plan.vencida && !plan.sinFecha && (
         <div className="mt-3">
           <ConsejoMeta porDia={plan.porDia} faltante={plan.faltante} ingresoDiario={ingresoDiario} />
         </div>
@@ -64,7 +72,7 @@ export default function TarjetaMeta({ meta, ingresoDiario, onAbonar, onEditar }:
           onClick={onAbonar}
           className="flex-1 rounded-xl bg-emerald-600 py-2 text-sm font-semibold text-white transition active:scale-95"
         >
-          {plan.completada ? 'Retirar' : 'Abonar'}
+          {plan.completada && !plan.sinFecha ? 'Retirar' : 'Abonar'}
         </button>
         <button
           onClick={onEditar}

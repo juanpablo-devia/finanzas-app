@@ -11,6 +11,22 @@ export function diasEntre(desdeISO: string, hastaISO: string): number {
 
 export function calcularPlanMeta(meta: Meta, hoy = hoyISO()) {
   const faltante = Math.max(0, meta.montoObjetivo - meta.ahorrado)
+  const progreso = meta.montoObjetivo > 0 ? Math.min(1, meta.ahorrado / meta.montoObjetivo) : 0
+
+  // Metas sin fecha (como el colchón): el objetivo es un MÍNIMO a mantener, sin plan diario
+  if (!meta.fechaLimite) {
+    return {
+      faltante,
+      diasRestantes: 0,
+      porDia: 0,
+      porSemana: 0,
+      progreso,
+      completada: faltante === 0,
+      vencida: false,
+      sinFecha: true,
+    }
+  }
+
   const diasHastaLimite = diasEntre(hoy, meta.fechaLimite)
   const diasRestantes = Math.max(1, diasHastaLimite)
   const porDia = Math.ceil(faltante / diasRestantes)
@@ -20,9 +36,10 @@ export function calcularPlanMeta(meta: Meta, hoy = hoyISO()) {
     diasRestantes,
     porDia,
     porSemana: Math.min(faltante, porDia * 7),
-    progreso: meta.montoObjetivo > 0 ? Math.min(1, meta.ahorrado / meta.montoObjetivo) : 0,
+    progreso,
     completada: faltante === 0,
     vencida: faltante > 0 && diasHastaLimite < 0,
+    sinFecha: false,
   }
 }
 
