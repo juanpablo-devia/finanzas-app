@@ -7,6 +7,7 @@ import FormularioPrevisto from './components/FormularioPrevisto'
 import FormularioMeta from './components/FormularioMeta'
 import FormularioMovimiento from './components/FormularioMovimiento'
 import HojaAbono from './components/HojaAbono'
+import HojaClaude from './components/HojaClaude'
 import MenuAgregar, { type OpcionAgregar } from './components/MenuAgregar'
 import { useFinanzas } from './hooks/useFinanzas'
 import Inicio from './pantallas/Inicio'
@@ -31,6 +32,7 @@ function App() {
   const [formularioCompromisoAbierto, setFormularioCompromisoAbierto] = useState(false)
   const [compromisoEditando, setCompromisoEditando] = useState<Compromiso | null>(null)
   const [formularioPrevistoAbierto, setFormularioPrevistoAbierto] = useState(false)
+  const [hojaClaudeAbierta, setHojaClaudeAbierta] = useState(false)
   const [previstoEditando, setPrevistoEditando] = useState<Previsto | null>(null)
   // Cuando registras un ingreso esperado desde "¿Ya te llegó?"
   const [previstoEnCurso, setPrevistoEnCurso] = useState<{ previsto: Previsto; fecha: string } | null>(null)
@@ -265,6 +267,7 @@ function App() {
             finanzas={finanzas}
             nombre={nombre}
             onCambiarNombre={cambiarNombre}
+            onContarleAClaude={() => setHojaClaudeAbierta(true)}
             onEditarPresupuesto={editarPresupuesto}
             onNavegar={navegar}
             onTocarMovimiento={abrirEdicion}
@@ -368,6 +371,9 @@ function App() {
           onEliminar={pedirEliminarPrevisto}
           onCerrar={() => setFormularioPrevistoAbierto(false)}
         />
+      )}
+      {hojaClaudeAbierta && (
+        <HojaClaude finanzas={finanzas} nombre={nombre} onCerrar={() => setHojaClaudeAbierta(false)} />
       )}
       {celebracion && (
         <Celebracion

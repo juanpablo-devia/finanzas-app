@@ -13,6 +13,7 @@ interface Props {
   finanzas: Finanzas
   nombre: string
   onCambiarNombre: () => void
+  onContarleAClaude: () => void
   onEditarPresupuesto: () => void
   onNavegar: (pantalla: Pantalla) => void
   onTocarMovimiento: (movimiento: Movimiento) => void
@@ -35,6 +36,7 @@ export default function Inicio({
   finanzas,
   nombre,
   onCambiarNombre,
+  onContarleAClaude,
   onEditarPresupuesto,
   onNavegar,
   onTocarMovimiento,
@@ -52,13 +54,22 @@ export default function Inicio({
           <p className="text-sm text-gray-500 dark:text-gray-400">{saludoSegunHora()} 👋</p>
           <h1 className="text-2xl font-bold">{nombre}</h1>
         </div>
-        <button
-          onClick={onCambiarNombre}
-          aria-label="Cambiar nombre"
-          className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-600 font-semibold text-white transition active:scale-90"
-        >
-          {obtenerIniciales(nombre)}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onContarleAClaude}
+            aria-label="Contarle a Claude"
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-orange-50 text-xl transition active:scale-90 dark:bg-orange-950/60"
+          >
+            ✨
+          </button>
+          <button
+            onClick={onCambiarNombre}
+            aria-label="Cambiar nombre"
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-600 font-semibold text-white transition active:scale-90"
+          >
+            {obtenerIniciales(nombre)}
+          </button>
+        </div>
       </header>
 
       {/* Tarjeta de saldo */}
