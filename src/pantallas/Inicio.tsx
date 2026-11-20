@@ -147,6 +147,9 @@ export default function Inicio({
           </ul>
         )}
       </section>
+
+      {/* Desde qué dirección corre la app (útil para saber cuál versión tienes instalada) */}
+      <p className="mt-10 text-center text-[11px] text-gray-400">{window.location.hostname}</p>
     </>
   )
 }
