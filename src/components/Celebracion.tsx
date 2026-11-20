@@ -1,13 +1,12 @@
-import type { Meta } from '../types'
-
 const CONFETI = ['🎉', '✨', '💚', '🎊', '⭐', '💰']
 
 interface Props {
-  meta: Meta
+  emoji: string
+  mensaje: string // ej. 'Completaste tu meta "PS5"'
   onCerrar: () => void
 }
 
-export default function Celebracion({ meta, onCerrar }: Props) {
+export default function Celebracion({ emoji, mensaje, onCerrar }: Props) {
   return (
     <div
       onClick={onCerrar}
@@ -25,9 +24,9 @@ export default function Celebracion({ meta, onCerrar }: Props) {
         </span>
       ))}
 
-      <p className="animate-bounce text-7xl">{meta.emoji}</p>
+      <p className="animate-bounce text-7xl">{emoji}</p>
       <h2 className="mt-6 text-3xl font-bold">¡Lo lograste!</h2>
-      <p className="mt-2 text-lg opacity-90">Completaste tu meta "{meta.nombre}"</p>
+      <p className="mt-2 text-lg opacity-90">{mensaje}</p>
       <p className="mt-8 text-sm opacity-60">Toca para continuar</p>
     </div>
   )

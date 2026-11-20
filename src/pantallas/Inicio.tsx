@@ -1,4 +1,5 @@
 import ItemMovimiento from '../components/ItemMovimiento'
+import ProximosPagos from '../components/ProximosPagos'
 import TarjetaPresupuesto from '../components/TarjetaPresupuesto'
 import type { Pantalla } from '../components/BarraNavegacion'
 import type { Finanzas } from '../hooks/useFinanzas'
@@ -91,8 +92,11 @@ export default function Inicio({
       </section>
 
       {/* Metas (versión resumida) */}
+      {/* Próximas cuotas (solo aparece si hay alguna en los próximos 45 días) */}
+      <ProximosPagos compromisos={finanzas.compromisos} onVerTodo={() => onNavegar('metas')} />
+
       <section className="mt-6">
-        <TituloSeccion titulo="Mis metas" onVerTodo={() => onNavegar('metas')} />
+        <TituloSeccion titulo="Mis bolsillos" onVerTodo={() => onNavegar('metas')} />
 
         {metas.length === 0 ? (
           <button

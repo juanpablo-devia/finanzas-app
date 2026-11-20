@@ -2,6 +2,7 @@ import { useState } from 'react'
 import BarraNavegacion, { type Pantalla } from './components/BarraNavegacion'
 import Bienvenida from './components/Bienvenida'
 import Celebracion from './components/Celebracion'
+import FormularioCompromiso from './components/FormularioCompromiso'
 import FormularioMeta from './components/FormularioMeta'
 import FormularioMovimiento from './components/FormularioMovimiento'
 import HojaAbono from './components/HojaAbono'
@@ -11,7 +12,7 @@ import Inicio from './pantallas/Inicio'
 import Metas from './pantallas/Metas'
 import Movimientos from './pantallas/Movimientos'
 import Resumen from './pantallas/Resumen'
-import type { Abono, Meta, Movimiento, TipoMovimiento } from './types'
+import type { Abono, Compromiso, Cuota, Meta, Movimiento, TipoMovimiento } from './types'
 import { formatearPesos } from './utils/formato'
 
 function App() {
@@ -25,7 +26,9 @@ function App() {
   const [formularioMetaAbierto, setFormularioMetaAbierto] = useState(false)
   const [metaEditando, setMetaEditando] = useState<Meta | null>(null)
   const [metaAbonando, setMetaAbonando] = useState<Meta | null>(null)
-  const [metaCelebrada, setMetaCelebrada] = useState<Meta | null>(null)
+  const [celebracion, setCelebracion] = useState<{ emoji: string; mensaje: string } | null>(null)
+  const [formularioCompromisoAbierto, setFormularioCompromisoAbierto] = useState(false)
+  const [compromisoEditando, setCompromisoEditando] = useState<Compromiso | null>(null)
   const [nombre, setNombre] = useState(() => localStorage.getItem('nombre') ?? '')
 
   // ---- Navegación ----
@@ -39,6 +42,8 @@ function App() {
     setMenuAbierto(false)
     if (opcion === 'meta') {
       abrirNuevaMeta()
+    } else if (opcion === 'cuotas') {
+      abrirNuevoCompromiso()
     } else {
       setTipoNuevo(opcion) // 'gasto' o 'ingreso'
       setMovimientoEditando(null)
@@ -47,9 +52,9 @@ function App() {
   }
 
   // ---- Celebración ----
-  function celebrar(meta: Meta) {
-    setMetaCelebrada(meta)
-    setTimeout(() => setMetaCelebrada(null), 4500) // se cierra sola a los 4,5 s
+  function celebrar(emoji: string, mensaje: string) {
+    setCelebracion({ emoji, mensaje })
+    setTimeout(() => setCelebracion(null), 4500) // se cierra sola a los 4,5 s
   }
 
   // ---- Nombre ----
@@ -94,7 +99,7 @@ function App() {
         ({ abono, meta }) =>
           meta && meta.ahorrado < meta.montoObjetivo && meta.ahorrado + abono.monto >= meta.montoObjetivo,
       )
-    if (completada?.meta) celebrar(completada.meta)
+    if (completada?.meta) celebrar(completada.meta.emoji, `Completaste tu meta "${completada.meta.nombre}"`)
   }
 
   async function pedirEliminarMovimiento(m: Movimiento) {
@@ -131,7 +136,7 @@ function App() {
 
     // Si con este abono llegó al 100%, ¡a celebrar!
     if (valor > 0 && meta.ahorrado < meta.montoObjetivo && meta.ahorrado + valor >= meta.montoObjetivo) {
-      celebrar(meta)
+      celebrar(meta.emoji, `Completaste tu meta "${meta.nombre}"`)
     }
   }
 
@@ -143,6 +148,54 @@ function App() {
       await finanzas.eliminarMeta(meta.id)
       setFormularioMetaAbierto(false)
     }
+  }
+
+  // ---- Compras a cuotas ----
+  function abrirNuevoCompromiso() {
+    setCompromisoEditando(null)
+    setFormularioCompromisoAbierto(true)
+  }
+
+  function abrirEdicionCompromiso(compromiso: Compromiso) {
+    setCompromisoEditando(compromiso)
+    setFormularioCompromisoAbierto(true)
+  }
+
+  async function guardarCompromiso(compromiso: Compromiso) {
+    await finanzas.guardarCompromiso(compromiso)
+    setFormularioCompromisoAbierto(false)
+  }
+
+  async function pedirEliminarCompromiso(compromiso: Compromiso) {
+    const ok = window.confirm(
+      `¿Eliminar "${compromiso.nombre}"? Las cuotas que ya pagaste siguen registradas como gastos.`,
+    )
+    if (ok) {
+      await finanzas.eliminarCompromiso(compromiso.id)
+      setFormularioCompromisoAbierto(false)
+    }
+  }
+
+  async function tocarCuota(compromiso: Compromiso, cuota: Cuota) {
+    const etiqueta = `cuota ${cuota.numero}/${compromiso.cuotas.length} de "${compromiso.nombre}"`
+
+    if (cuota.pagada) {
+      if (window.confirm(`¿Marcar la ${etiqueta} como NO pagada? Se borra el gasto que se registró.`)) {
+        await finanzas.deshacerPagoCuota(compromiso.id, cuota.numero)
+      }
+      return
+    }
+
+    const bolsillo = finanzas.metas.find((m) => m.id === compromiso.metaId)
+    const origen = bolsillo ? `del bolsillo ${bolsillo.nombre}` : 'de tu saldo disponible'
+    if (!window.confirm(`¿Pagaste la ${etiqueta} por ${formatearPesos(cuota.monto)}? Se registra como gasto y sale ${origen}.`)) {
+      return
+    }
+    await finanzas.pagarCuota(compromiso.id, cuota.numero)
+
+    // ¿Era la última que faltaba?
+    const pendientes = compromiso.cuotas.filter((c) => !c.pagada).length
+    if (pendientes === 1) celebrar(compromiso.emoji, `Terminaste de pagar "${compromiso.nombre}"`)
   }
 
   // ---- Pantalla de bienvenida si no hay nombre ----
@@ -173,11 +226,17 @@ function App() {
         {pantalla === 'metas' && (
           <Metas
             metas={finanzas.metas}
+            compromisos={finanzas.compromisos}
             totalAhorrado={finanzas.totalAhorrado}
             ingresoDiario={finanzas.ingresoDiario}
+            ingresoFijoMensual={finanzas.ingresoFijoMensual}
+            cuotasDelMes={finanzas.cuotasDelMes}
             onNuevaMeta={abrirNuevaMeta}
             onAbonar={setMetaAbonando}
             onEditar={abrirEdicionMeta}
+            onNuevoCompromiso={abrirNuevoCompromiso}
+            onEditarCompromiso={abrirEdicionCompromiso}
+            onTocarCuota={tocarCuota}
           />
         )}
         {pantalla === 'resumen' && (
@@ -225,7 +284,22 @@ function App() {
           onCerrar={() => setMetaAbonando(null)}
         />
       )}
-      {metaCelebrada && <Celebracion meta={metaCelebrada} onCerrar={() => setMetaCelebrada(null)} />}
+      {formularioCompromisoAbierto && (
+        <FormularioCompromiso
+          compromiso={compromisoEditando ?? undefined}
+          metas={finanzas.metas}
+          onGuardar={guardarCompromiso}
+          onEliminar={pedirEliminarCompromiso}
+          onCerrar={() => setFormularioCompromisoAbierto(false)}
+        />
+      )}
+      {celebracion && (
+        <Celebracion
+          emoji={celebracion.emoji}
+          mensaje={celebracion.mensaje}
+          onCerrar={() => setCelebracion(null)}
+        />
+      )}
     </>
   )
 }

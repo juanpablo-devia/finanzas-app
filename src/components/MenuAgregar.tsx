@@ -1,4 +1,4 @@
-export type OpcionAgregar = 'gasto' | 'ingreso' | 'meta'
+export type OpcionAgregar = 'gasto' | 'ingreso' | 'meta' | 'cuotas'
 
 interface Opcion {
   id: OpcionAgregar
@@ -11,7 +11,8 @@ interface Opcion {
 const OPCIONES: Opcion[] = [
   { id: 'gasto', etiqueta: 'Gasto', descripcion: 'Algo que pagaste', emoji: '💸', color: 'bg-red-500/15' },
   { id: 'ingreso', etiqueta: 'Ingreso', descripcion: 'Plata que te entró', emoji: '💰', color: 'bg-emerald-500/15' },
-  { id: 'meta', etiqueta: 'Nueva meta', descripcion: 'Algo para lo que quieres ahorrar', emoji: '🎯', color: 'bg-amber-500/15' },
+  { id: 'meta', etiqueta: 'Nuevo bolsillo', descripcion: 'Algo para lo que quieres ahorrar', emoji: '🎯', color: 'bg-amber-500/15' },
+  { id: 'cuotas', etiqueta: 'Compra a cuotas', descripcion: 'Algo que pagas por partes', emoji: '🧾', color: 'bg-indigo-500/15' },
 ]
 
 interface Props {

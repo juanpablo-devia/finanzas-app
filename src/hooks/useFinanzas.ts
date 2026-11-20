@@ -1,7 +1,17 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
-import { FUERA_DEL_PRESUPUESTO, PRESUPUESTO_SEMANAL_INICIAL, type Abono, type Meta, type Movimiento } from '../types'
+import {
+  FUENTES_FIJAS,
+  FUERA_DEL_PRESUPUESTO,
+  PRESUPUESTO_SEMANAL_INICIAL,
+  type Abono,
+  type Compromiso,
+  type Meta,
+  type Movimiento,
+} from '../types'
+import { totalCuotasDelMes } from '../utils/cuotas'
+import { generarId } from '../utils/id'
 import { hoyISO, inicioSemanaISO } from '../utils/formato'
 import { diasEntre, ingresoDiarioPromedio } from '../utils/metas'
 
@@ -19,6 +29,7 @@ export function useFinanzas() {
   const metas = [...metasGuardadas].sort((a, b) =>
     (a.fechaLimite || '9999').localeCompare(b.fechaLimite || '9999'),
   )
+  const compromisos = useLiveQuery(() => db.compromisos.toArray(), []) ?? []
   const [presupuestoSemanal, setPresupuestoSemanal] = useState(
     () => Number(localStorage.getItem('presupuestoSemanal')) || PRESUPUESTO_SEMANAL_INICIAL,
   )
@@ -53,6 +64,13 @@ export function useFinanzas() {
 
   // Promedio de lo que ganas al día (para saber si una meta es realista)
   const ingresoDiario = ingresoDiarioPromedio(movimientos)
+
+  // ---- Regla de cuotas: cuánto pesan frente a tus ingresos FIJOS del mes ----
+  // Se estima con el promedio diario de Trabajo + Mensualidad × 30 (más preciso entre más datos tengas)
+  const ingresoFijoMensual = Math.round(
+    ingresoDiarioPromedio(movimientos.filter((m) => FUENTES_FIJAS.includes(m.categoria))) * 30,
+  )
+  const cuotasDelMes = totalCuotasDelMes(compromisos, mesActual)
 
   // Más recientes primero
   const ordenados = [...movimientos].sort((a, b) => b.fecha.localeCompare(a.fecha))
@@ -98,6 +116,66 @@ export function useFinanzas() {
     })
   }
 
+  async function guardarCompromiso(compromiso: Compromiso) {
+    await db.compromisos.put(compromiso)
+  }
+
+  async function eliminarCompromiso(id: string) {
+    await db.compromisos.delete(id)
+  }
+
+  // Pagar una cuota = registrar el gasto + sacar la plata del bolsillo vinculado (si hay) + marcarla
+  async function pagarCuota(compromisoId: string, numero: number) {
+    await db.transaction('rw', db.compromisos, db.movimientos, db.metas, async () => {
+      const compromiso = await db.compromisos.get(compromisoId)
+      const cuota = compromiso?.cuotas.find((c) => c.numero === numero)
+      if (!compromiso || !cuota || cuota.pagada) return
+
+      const movimientoId = generarId()
+      await db.movimientos.add({
+        id: movimientoId,
+        tipo: 'gasto',
+        monto: cuota.monto,
+        descripcion: `${compromiso.nombre} · cuota ${numero}/${compromiso.cuotas.length}`,
+        categoria: 'Cuotas',
+        fecha: hoyISO(),
+      })
+
+      // Si hay bolsillo vinculado, la plata sale de ahí (hasta lo que tenga; el resto, de tu saldo)
+      let delBolsillo = 0
+      const meta = compromiso.metaId ? await db.metas.get(compromiso.metaId) : undefined
+      if (meta) {
+        delBolsillo = Math.min(meta.ahorrado, cuota.monto)
+        await db.metas.update(meta.id, { ahorrado: meta.ahorrado - delBolsillo })
+      }
+
+      await db.compromisos.update(compromisoId, {
+        cuotas: compromiso.cuotas.map((c) => (c.numero === numero ? { ...c, pagada: true, movimientoId, delBolsillo } : c)),
+      })
+    })
+  }
+
+  // Deshacer el pago: borra el gasto, devuelve la plata al bolsillo y la marca como pendiente
+  async function deshacerPagoCuota(compromisoId: string, numero: number) {
+    await db.transaction('rw', db.compromisos, db.movimientos, db.metas, async () => {
+      const compromiso = await db.compromisos.get(compromisoId)
+      const cuota = compromiso?.cuotas.find((c) => c.numero === numero)
+      if (!compromiso || !cuota || !cuota.pagada) return
+
+      if (cuota.movimientoId) await db.movimientos.delete(cuota.movimientoId)
+      const meta = compromiso.metaId ? await db.metas.get(compromiso.metaId) : undefined
+      if (meta && cuota.delBolsillo) {
+        await db.metas.update(meta.id, { ahorrado: meta.ahorrado + cuota.delBolsillo })
+      }
+
+      await db.compromisos.update(compromisoId, {
+        cuotas: compromiso.cuotas.map((c) =>
+          c.numero === numero ? { numero: c.numero, monto: c.monto, fecha: c.fecha, pagada: false } : c,
+        ),
+      })
+    })
+  }
+
   async function eliminarMeta(id: string) {
     await db.metas.delete(id)
   }
@@ -105,6 +183,9 @@ export function useFinanzas() {
   return {
     movimientos: ordenados,
     metas,
+    compromisos,
+    ingresoFijoMensual,
+    cuotasDelMes,
     saldo,
     totalAhorrado,
     ingresosMes,
@@ -123,6 +204,10 @@ export function useFinanzas() {
     actualizarMeta,
     abonarMeta,
     eliminarMeta,
+    guardarCompromiso,
+    eliminarCompromiso,
+    pagarCuota,
+    deshacerPagoCuota,
   }
 }
 

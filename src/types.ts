@@ -47,3 +47,24 @@ export interface Abono {
   metaId: string
   monto: number
 }
+// Ingresos que cuentan como "fijos" para tu regla de cuotas (lo de tu papá y los extras no cuentan)
+export const FUENTES_FIJAS = ['Trabajo', 'Mensualidad']
+
+export interface Cuota {
+  numero: number // 1, 2, 3...
+  monto: number
+  fecha: string // vencimiento 'YYYY-MM-DD'
+  pagada: boolean
+  movimientoId?: string // el gasto que se registró al pagarla (para poder deshacer)
+  delBolsillo?: number // cuánto se sacó del bolsillo vinculado al pagarla
+}
+
+// Una compra o deuda que se paga en cuotas
+export interface Compromiso {
+  id: string
+  nombre: string // "Regalo novia", "PS5"
+  emoji: string
+  acreedor: string // a quién le pagas: "Mi primo", "Tarjeta de crédito"
+  metaId: string // bolsillo del que salen las cuotas, o '' si sale de tu saldo
+  cuotas: Cuota[]
+}
