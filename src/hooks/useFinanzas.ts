@@ -2,15 +2,15 @@ import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import {
-  FUENTES_FIJAS,
-  FUERA_DEL_PRESUPUESTO,
-  PRESUPUESTO_SEMANAL_INICIAL,
   type Abono,
   type Compromiso,
   type Meta,
   type Movimiento,
   type Previsto,
+  type TipoMovimiento,
 } from '../types'
+import { guardarConfiguracion, leerConfiguracion, type Configuracion } from '../utils/configuracion'
+import { renombrarFuente } from '../utils/plantillas'
 import { totalCuotasDelMes } from '../utils/cuotas'
 import { generarId } from '../utils/id'
 import { hoyISO, inicioSemanaISO } from '../utils/formato'
@@ -32,9 +32,8 @@ export function useFinanzas() {
   )
   const compromisos = useLiveQuery(() => db.compromisos.toArray(), []) ?? []
   const previstos = useLiveQuery(() => db.previstos.orderBy('id').toArray(), []) ?? []
-  const [presupuestoSemanal, setPresupuestoSemanal] = useState(
-    () => Number(localStorage.getItem('presupuestoSemanal')) || PRESUPUESTO_SEMANAL_INICIAL,
-  )
+  const [configuracion, setConfiguracion] = useState(leerConfiguracion)
+  const { presupuestoSemanal, fueraDelPresupuesto, fuentesFijas } = configuracion
 
   // ---- Valores derivados ----
   const ingresos = movimientos.filter((m) => m.tipo === 'ingreso')
@@ -53,7 +52,7 @@ export function useFinanzas() {
   const inicioSemana = inicioSemanaISO()
   const gastadoSemana = sumar(
     gastos.filter(
-      (m) => m.fecha >= inicioSemana && m.fecha <= hoy && !FUERA_DEL_PRESUPUESTO.includes(m.categoria),
+      (m) => m.fecha >= inicioSemana && m.fecha <= hoy && !fueraDelPresupuesto.includes(m.categoria),
     ),
   )
   const diasTranscurridosSemana = diasEntre(inicioSemana, hoy) + 1 // lunes = 1 ... domingo = 7
@@ -70,7 +69,7 @@ export function useFinanzas() {
   // ---- Regla de cuotas: cuánto pesan frente a tus ingresos FIJOS del mes ----
   // Se estima con el promedio diario de Trabajo + Mensualidad × 30 (más preciso entre más datos tengas)
   const ingresoFijoMensual = Math.round(
-    ingresoDiarioPromedio(movimientos.filter((m) => FUENTES_FIJAS.includes(m.categoria))) * 30,
+    ingresoDiarioPromedio(movimientos.filter((m) => fuentesFijas.includes(m.categoria))) * 30,
   )
   const cuotasDelMes = totalCuotasDelMes(compromisos, mesActual)
 
@@ -78,9 +77,34 @@ export function useFinanzas() {
   const ordenados = [...movimientos].sort((a, b) => b.fecha.localeCompare(a.fecha))
 
   // ---- Acciones ----
+  function cambiarConfiguracion(nueva: Configuracion) {
+    guardarConfiguracion(nueva)
+    setConfiguracion(nueva)
+  }
+
   function cambiarPresupuestoSemanal(valor: number) {
-    localStorage.setItem('presupuestoSemanal', String(valor))
-    setPresupuestoSemanal(valor)
+    cambiarConfiguracion({ ...configuracion, presupuestoSemanal: valor })
+  }
+
+  // Renombra una categoría en la configuración Y en todos los movimientos y previstos que la usan
+  async function renombrarCategoria(tipo: TipoMovimiento, viejo: string, nuevo: string) {
+    const cambiar = (lista: string[]) => lista.map((c) => (c === viejo ? nuevo : c))
+    cambiarConfiguracion({
+      ...configuracion,
+      categorias: { ...configuracion.categorias, [tipo]: cambiar(configuracion.categorias[tipo]) },
+      fuentesFijas: tipo === 'ingreso' ? cambiar(configuracion.fuentesFijas) : configuracion.fuentesFijas,
+      fueraDelPresupuesto: tipo === 'gasto' ? cambiar(configuracion.fueraDelPresupuesto) : configuracion.fueraDelPresupuesto,
+    })
+    if (tipo === 'ingreso') renombrarFuente(viejo, nuevo) // el plan de reparto de esa fuente también
+    // Solo los del mismo tipo: "Otro" existe tanto en ingresos como en gastos
+    await db.transaction('rw', db.movimientos, db.previstos, async () => {
+      await db.movimientos
+        .where('categoria')
+        .equals(viejo)
+        .and((m) => m.tipo === tipo)
+        .modify({ categoria: nuevo })
+      await db.previstos.filter((p) => p.categoria === viejo && p.tipo === tipo).modify({ categoria: nuevo })
+    })
   }
 
   async function agregarMovimiento(nuevo: Movimiento, abonos: Abono[]) {
@@ -214,6 +238,9 @@ export function useFinanzas() {
     gastosMes,
     puedoGastarHoy,
     presupuestoSemanal,
+    configuracion,
+    cambiarConfiguracion,
+    renombrarCategoria,
     gastadoSemana,
     diasTranscurridosSemana,
     diasQuedanSemana,

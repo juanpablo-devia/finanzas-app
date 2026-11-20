@@ -10,6 +10,7 @@ import HojaAbono from './components/HojaAbono'
 import HojaClaude from './components/HojaClaude'
 import MenuAgregar, { type OpcionAgregar } from './components/MenuAgregar'
 import { useFinanzas } from './hooks/useFinanzas'
+import Ajustes from './pantallas/Ajustes'
 import Inicio from './pantallas/Inicio'
 import Metas from './pantallas/Metas'
 import Movimientos from './pantallas/Movimientos'
@@ -69,21 +70,6 @@ function App() {
   function guardarNombre(nuevo: string) {
     localStorage.setItem('nombre', nuevo)
     setNombre(nuevo)
-  }
-
-  function cambiarNombre() {
-    const nuevo = window.prompt('¿Cómo quieres que te llame?', nombre)
-    if (nuevo?.trim()) guardarNombre(nuevo.trim())
-  }
-
-  // ---- Presupuesto semanal ----
-  function editarPresupuesto() {
-    const texto = window.prompt(
-      '¿Cuánto quieres gastar por semana? (gasolina, salidas, aseo, comida...)',
-      String(finanzas.presupuestoSemanal),
-    )
-    const valor = Number(texto?.replace(/\D/g, '') ?? 0)
-    if (valor > 0) finanzas.cambiarPresupuestoSemanal(valor)
   }
 
   // ---- Acciones con confirmación (la parte de "interfaz") ----
@@ -266,9 +252,9 @@ function App() {
           <Inicio
             finanzas={finanzas}
             nombre={nombre}
-            onCambiarNombre={cambiarNombre}
+            onAbrirAjustes={() => navegar('ajustes')}
             onContarleAClaude={() => setHojaClaudeAbierta(true)}
-            onEditarPresupuesto={editarPresupuesto}
+            onEditarPresupuesto={() => navegar('ajustes')}
             onNavegar={navegar}
             onTocarMovimiento={abrirEdicion}
             onRegistrarPrevisto={registrarPrevisto}
@@ -292,6 +278,14 @@ function App() {
             onNuevoCompromiso={abrirNuevoCompromiso}
             onEditarCompromiso={abrirEdicionCompromiso}
             onTocarCuota={tocarCuota}
+          />
+        )}
+        {pantalla === 'ajustes' && (
+          <Ajustes
+            finanzas={finanzas}
+            nombre={nombre}
+            onCambiarNombre={guardarNombre}
+            onVolver={() => navegar('inicio')}
           />
         )}
         {pantalla === 'resumen' && (
@@ -320,6 +314,7 @@ function App() {
       {formularioAbierto && (
         <FormularioMovimiento
           metas={finanzas.metas}
+          categorias={finanzas.configuracion.categorias}
           tipoInicial={tipoNuevo}
           movimiento={movimientoEditando ?? undefined}
           valoresIniciales={
@@ -366,6 +361,7 @@ function App() {
       )}
       {formularioPrevistoAbierto && (
         <FormularioPrevisto
+          categorias={finanzas.configuracion.categorias}
           previsto={previstoEditando ?? undefined}
           onGuardar={guardarPrevisto}
           onEliminar={pedirEliminarPrevisto}

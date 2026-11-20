@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { IconoGrafica, IconoInicio, IconoLista, IconoMas, IconoMeta } from './Iconos'
 
-export type Pantalla = 'inicio' | 'movimientos' | 'metas' | 'resumen'
+export type Pantalla = 'inicio' | 'movimientos' | 'metas' | 'resumen' | 'ajustes'
 
 interface Pestana {
   id: Pantalla

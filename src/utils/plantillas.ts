@@ -27,3 +27,16 @@ export function guardarPlantilla(fuente: string, proporciones: Proporciones) {
     // sin almacenamiento disponible: el reparto se guarda igual, solo no se recuerda el plan
   }
 }
+
+// Si renombras una fuente de ingreso, su plan de reparto pasa al nombre nuevo
+export function renombrarFuente(vieja: string, nueva: string) {
+  const todas = leerTodas()
+  if (!todas[vieja]) return
+  todas[nueva] = todas[vieja]
+  delete todas[vieja]
+  try {
+    localStorage.setItem(CLAVE, JSON.stringify(todas))
+  } catch {
+    // sin almacenamiento disponible
+  }
+}

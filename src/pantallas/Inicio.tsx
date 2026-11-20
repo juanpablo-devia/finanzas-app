@@ -12,7 +12,7 @@ import { obtenerIniciales, saludoSegunHora } from '../utils/saludo'
 interface Props {
   finanzas: Finanzas
   nombre: string
-  onCambiarNombre: () => void
+  onAbrirAjustes: () => void
   onContarleAClaude: () => void
   onEditarPresupuesto: () => void
   onNavegar: (pantalla: Pantalla) => void
@@ -35,7 +35,7 @@ function TituloSeccion({ titulo, onVerTodo }: { titulo: string; onVerTodo: () =>
 export default function Inicio({
   finanzas,
   nombre,
-  onCambiarNombre,
+  onAbrirAjustes,
   onContarleAClaude,
   onEditarPresupuesto,
   onNavegar,
@@ -63,8 +63,8 @@ export default function Inicio({
             ✨
           </button>
           <button
-            onClick={onCambiarNombre}
-            aria-label="Cambiar nombre"
+            onClick={onAbrirAjustes}
+            aria-label="Ajustes"
             className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-600 font-semibold text-white transition active:scale-90"
           >
             {obtenerIniciales(nombre)}
@@ -174,9 +174,6 @@ export default function Inicio({
           </ul>
         )}
       </section>
-
-      {/* Desde qué dirección corre la app (útil para saber cuál versión tienes instalada) */}
-      <p className="mt-10 text-center text-[11px] text-gray-400">{window.location.hostname}</p>
     </>
   )
 }

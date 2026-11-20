@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { CATEGORIAS, type Frecuencia, type Previsto, type TipoMovimiento } from '../types'
+import type { Frecuencia, Previsto, TipoMovimiento } from '../types'
 import { hoyISO } from '../utils/formato'
 import { generarId } from '../utils/id'
 import CampoSelect from './CampoSelect'
 
 interface Props {
+  categorias: Record<TipoMovimiento, string[]>
   previsto?: Previsto // si viene, el formulario está en modo EDICIÓN
   onGuardar: (previsto: Previsto) => void
   onEliminar?: (previsto: Previsto) => void
@@ -20,12 +21,12 @@ const FRECUENCIAS: { id: Frecuencia; etiqueta: string }[] = [
   { id: 'mensual', etiqueta: 'Cada mes' },
 ]
 
-export default function FormularioPrevisto({ previsto, onGuardar, onEliminar, onCerrar }: Props) {
+export default function FormularioPrevisto({ categorias, previsto, onGuardar, onEliminar, onCerrar }: Props) {
   const esEdicion = previsto !== undefined
   const [tipo, setTipo] = useState<TipoMovimiento>(previsto?.tipo ?? 'ingreso')
   const [monto, setMonto] = useState(previsto ? String(previsto.monto) : '')
   const [descripcion, setDescripcion] = useState(previsto?.descripcion ?? '')
-  const [categoria, setCategoria] = useState(previsto?.categoria ?? CATEGORIAS.ingreso[0])
+  const [categoria, setCategoria] = useState(previsto?.categoria ?? categorias.ingreso[0] ?? 'Otro')
   const [frecuencia, setFrecuencia] = useState<Frecuencia>(previsto?.frecuencia ?? 'una vez')
   const [desde, setDesde] = useState(previsto?.desde ?? hoyISO())
   const [hasta, setHasta] = useState(previsto?.hasta ?? '')
@@ -34,7 +35,7 @@ export default function FormularioPrevisto({ previsto, onGuardar, onEliminar, on
 
   function cambiarTipo(nuevo: TipoMovimiento) {
     setTipo(nuevo)
-    setCategoria(CATEGORIAS[nuevo][0])
+    setCategoria(categorias[nuevo][0] ?? 'Otro')
   }
 
   function guardar() {
@@ -100,7 +101,7 @@ export default function FormularioPrevisto({ previsto, onGuardar, onEliminar, on
               {tipo === 'ingreso' ? '¿De dónde?' : 'Categoría'}
             </span>
             <CampoSelect value={categoria} onChange={(e) => setCategoria(e.target.value)}>
-              {CATEGORIAS[tipo].map((c) => (
+              {categorias[tipo].map((c) => (
                 <option key={c}>{c}</option>
               ))}
             </CampoSelect>

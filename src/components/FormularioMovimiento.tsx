@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CATEGORIAS, type Abono, type Meta, type Movimiento, type TipoMovimiento } from '../types'
+import type { Abono, Meta, Movimiento, TipoMovimiento } from '../types'
 import { generarId } from '../utils/id'
 import { formatearPesos, hoyISO } from '../utils/formato'
 import { calcularPlanMeta } from '../utils/metas'
@@ -8,6 +8,7 @@ import CampoSelect from './CampoSelect'
 
 interface Props {
   metas: Meta[]
+  categorias: Record<TipoMovimiento, string[]>
   tipoInicial?: TipoMovimiento
   movimiento?: Movimiento // si viene, el formulario está en modo EDICIÓN
   valoresIniciales?: Omit<Movimiento, 'id'> // para arrancar con datos (ej. un ingreso esperado), sin ser edición
@@ -29,6 +30,7 @@ const formatearDigitos = (digitos: string) => (digitos ? Number(digitos).toLocal
 
 export default function FormularioMovimiento({
   metas,
+  categorias,
   tipoInicial = 'gasto',
   movimiento,
   valoresIniciales,
@@ -49,7 +51,7 @@ export default function FormularioMovimiento({
   const [tipo, setTipo] = useState<TipoMovimiento>(tipoArranque)
   const [monto, setMonto] = useState(inicial ? String(inicial.monto) : '') // solo dígitos
   const [descripcion, setDescripcion] = useState(inicial?.descripcion ?? '')
-  const [categoria, setCategoria] = useState(inicial?.categoria ?? CATEGORIAS[tipoArranque][0])
+  const [categoria, setCategoria] = useState(inicial?.categoria ?? categorias[tipoArranque][0] ?? 'Otro')
   const [fecha, setFecha] = useState(inicial?.fecha ?? hoyISO())
 
   // Reparto: null = todavía no lo has tocado, así que usamos el plan guardado de esa fuente
@@ -85,12 +87,12 @@ export default function FormularioMovimiento({
 
   function cambiarTipo(nuevo: TipoMovimiento) {
     setTipo(nuevo)
-    setCategoria(CATEGORIAS[nuevo][0])
+    setCategoria(categorias[nuevo][0] ?? 'Otro')
   }
 
   // Si editas un movimiento viejo con una categoría que ya no existe, la mostramos igual
   // para no cambiarla sin querer
-  const opcionesCategoria = CATEGORIAS[tipo].includes(categoria) ? CATEGORIAS[tipo] : [categoria, ...CATEGORIAS[tipo]]
+  const opcionesCategoria = categorias[tipo].includes(categoria) ? categorias[tipo] : [categoria, ...categorias[tipo]]
 
   function guardar() {
     if (!valor || seExcede) return
