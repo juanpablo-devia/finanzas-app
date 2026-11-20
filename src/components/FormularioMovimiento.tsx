@@ -59,6 +59,10 @@ export default function FormularioMovimiento({
     setCategoria(CATEGORIAS[nuevo][0])
   }
 
+  // Si editas un movimiento viejo con una categoría que ya no existe, la mostramos igual
+  // para no cambiarla sin querer
+  const opcionesCategoria = CATEGORIAS[tipo].includes(categoria) ? CATEGORIAS[tipo] : [categoria, ...CATEGORIAS[tipo]]
+
   function guardar() {
     if (!valor) return
     const datos: Movimiento = {
@@ -190,7 +194,7 @@ export default function FormularioMovimiento({
           <label className="block">
             <span className="text-sm text-gray-500 dark:text-gray-400">Categoría</span>
             <CampoSelect value={categoria} onChange={(e) => setCategoria(e.target.value)}>
-              {CATEGORIAS[tipo].map((c) => (
+              {opcionesCategoria.map((c) => (
                 <option key={c}>{c}</option>
               ))}
             </CampoSelect>

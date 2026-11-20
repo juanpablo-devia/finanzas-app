@@ -63,6 +63,16 @@ function App() {
     if (nuevo?.trim()) guardarNombre(nuevo.trim())
   }
 
+  // ---- Presupuesto semanal ----
+  function editarPresupuesto() {
+    const texto = window.prompt(
+      '¿Cuánto quieres gastar por semana? (gasolina, salidas, aseo, comida...)',
+      String(finanzas.presupuestoSemanal),
+    )
+    const valor = Number(texto?.replace(/\D/g, '') ?? 0)
+    if (valor > 0) finanzas.cambiarPresupuestoSemanal(valor)
+  }
+
   // ---- Acciones con confirmación (la parte de "interfaz") ----
   function abrirEdicion(m: Movimiento) {
     setMovimientoEditando(m)
@@ -145,6 +155,7 @@ function App() {
             finanzas={finanzas}
             nombre={nombre}
             onCambiarNombre={cambiarNombre}
+            onEditarPresupuesto={editarPresupuesto}
             onNavegar={navegar}
             onTocarMovimiento={abrirEdicion}
           />

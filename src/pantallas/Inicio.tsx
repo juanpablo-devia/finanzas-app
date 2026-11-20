@@ -1,4 +1,5 @@
 import ItemMovimiento from '../components/ItemMovimiento'
+import TarjetaPresupuesto from '../components/TarjetaPresupuesto'
 import type { Pantalla } from '../components/BarraNavegacion'
 import type { Finanzas } from '../hooks/useFinanzas'
 import type { Movimiento } from '../types'
@@ -10,6 +11,7 @@ interface Props {
   finanzas: Finanzas
   nombre: string
   onCambiarNombre: () => void
+  onEditarPresupuesto: () => void
   onNavegar: (pantalla: Pantalla) => void
   onTocarMovimiento: (movimiento: Movimiento) => void
 }
@@ -25,7 +27,14 @@ function TituloSeccion({ titulo, onVerTodo }: { titulo: string; onVerTodo: () =>
   )
 }
 
-export default function Inicio({ finanzas, nombre, onCambiarNombre, onNavegar, onTocarMovimiento }: Props) {
+export default function Inicio({
+  finanzas,
+  nombre,
+  onCambiarNombre,
+  onEditarPresupuesto,
+  onNavegar,
+  onTocarMovimiento,
+}: Props) {
   const { saldo, puedoGastarHoy, totalAhorrado, ingresosMes, gastosMes, metas, movimientos } = finanzas
   const ultimos = movimientos.slice(0, 5)
 
@@ -57,6 +66,17 @@ export default function Inicio({ finanzas, nombre, onCambiarNombre, onNavegar, o
           {totalAhorrado > 0 && <p>En metas: {formatearPesos(totalAhorrado)}</p>}
         </div>
       </section>
+
+      {/* Presupuesto de la semana */}
+      <div className="mt-4">
+        <TarjetaPresupuesto
+          presupuesto={finanzas.presupuestoSemanal}
+          gastado={finanzas.gastadoSemana}
+          diasTranscurridos={finanzas.diasTranscurridosSemana}
+          diasQuedan={finanzas.diasQuedanSemana}
+          onEditar={onEditarPresupuesto}
+        />
+      </div>
 
       {/* Ingresos y gastos del mes */}
       <section className="mt-4 grid grid-cols-2 gap-3">

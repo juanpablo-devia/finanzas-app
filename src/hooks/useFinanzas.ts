@@ -1,8 +1,9 @@
+import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
-import type { Abono, Meta, Movimiento } from '../types'
-import { hoyISO } from '../utils/formato'
-import { ingresoDiarioPromedio } from '../utils/metas'
+import { FUERA_DEL_PRESUPUESTO, PRESUPUESTO_SEMANAL_INICIAL, type Abono, type Meta, type Movimiento } from '../types'
+import { hoyISO, inicioSemanaISO } from '../utils/formato'
+import { diasEntre, ingresoDiarioPromedio } from '../utils/metas'
 
 const sumar = (lista: Movimiento[]) => lista.reduce((total, m) => total + m.monto, 0)
 
@@ -14,6 +15,9 @@ const sumar = (lista: Movimiento[]) => lista.reduce((total, m) => total + m.mont
 export function useFinanzas() {
   const movimientos = useLiveQuery(() => db.movimientos.toArray(), []) ?? []
   const metas = useLiveQuery(() => db.metas.orderBy('fechaLimite').toArray(), []) ?? []
+  const [presupuestoSemanal, setPresupuestoSemanal] = useState(
+    () => Number(localStorage.getItem('presupuestoSemanal')) || PRESUPUESTO_SEMANAL_INICIAL,
+  )
 
   // ---- Valores derivados ----
   const ingresos = movimientos.filter((m) => m.tipo === 'ingreso')
@@ -27,12 +31,21 @@ export function useFinanzas() {
   const ingresosMes = sumar(ingresos.filter((m) => m.fecha.startsWith(mesActual)))
   const gastosMes = sumar(gastos.filter((m) => m.fecha.startsWith(mesActual)))
 
-  const hoy = new Date()
-  const diasDelMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate()
-  const diasRestantes = diasDelMes - hoy.getDate() + 1
+  // ---- Presupuesto de la semana (lunes a domingo) ----
+  const hoy = hoyISO()
+  const inicioSemana = inicioSemanaISO()
+  const gastadoSemana = sumar(
+    gastos.filter(
+      (m) => m.fecha >= inicioSemana && m.fecha <= hoy && !FUERA_DEL_PRESUPUESTO.includes(m.categoria),
+    ),
+  )
+  const diasTranscurridosSemana = diasEntre(inicioSemana, hoy) + 1 // lunes = 1 ... domingo = 7
+  const diasQuedanSemana = 8 - diasTranscurridosSemana // incluye hoy
+  const restanteSemana = presupuestoSemanal - gastadoSemana
 
-  // Lo de las metas ya está apartado, así que solo repartimos lo que es tuyo
-  const puedoGastarHoy = Math.max(0, Math.floor(saldo / diasRestantes))
+  // Lo que te queda de la semana repartido en los días que faltan,
+  // pero nunca más de lo que realmente tienes libre
+  const puedoGastarHoy = Math.max(0, Math.min(saldo, Math.floor(restanteSemana / diasQuedanSemana)))
 
   // Promedio de lo que ganas al día (para saber si una meta es realista)
   const ingresoDiario = ingresoDiarioPromedio(movimientos)
@@ -41,6 +54,11 @@ export function useFinanzas() {
   const ordenados = [...movimientos].sort((a, b) => b.fecha.localeCompare(a.fecha))
 
   // ---- Acciones ----
+  function cambiarPresupuestoSemanal(valor: number) {
+    localStorage.setItem('presupuestoSemanal', String(valor))
+    setPresupuestoSemanal(valor)
+  }
+
   async function agregarMovimiento(nuevo: Movimiento, abono: Abono | null) {
     // Transacción: o se guardan las dos cosas, o ninguna
     await db.transaction('rw', db.movimientos, db.metas, async () => {
@@ -88,6 +106,11 @@ export function useFinanzas() {
     ingresosMes,
     gastosMes,
     puedoGastarHoy,
+    presupuestoSemanal,
+    gastadoSemana,
+    diasTranscurridosSemana,
+    diasQuedanSemana,
+    cambiarPresupuestoSemanal,
     ingresoDiario,
     agregarMovimiento,
     actualizarMovimiento,
